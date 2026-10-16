@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: "var(--font-inter), var(--font-vazir), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  --color-bg: oklch(0.98 0 0);
+  --color-surface: oklch(1 0 0);
+  --color-border: oklch(0.92 0 0);
+  --color-text: oklch(0.2 0 0);
+  --color-text-muted: oklch(0.55 0 0);
+}
+
+/* RTL: use the Arabic-script font stack and flip logical layout defaults */
+html[dir="rtl"] {
+  --font-sans: "var(--font-vazir), var(--font-inter), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+}
+
+html[dir="rtl"] body {
+  letter-spacing: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+::selection {
+  background: oklch(0.7 0.2 240);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.85 0 0);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.75 0 0);
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------- Online storefront animations ---------- */
+@keyframes store-fade-up {
+  from {
+    opacity: 0.5;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes store-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes store-modal-in {
+  from {
+    opacity: 0.5;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Base opacity stays 1: if a browser/preview never runs the animation the
+   content is readable instead of invisible, and `both` still applies the
+   keyframe's start state (opacity 0.5) during the per-element delay. */
+.store-fade-up {
+  animation: store-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.store-pop {
+  animation: store-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.store-modal-in {
+  animation: store-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.store-glow {
+  animation: store-glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes store-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 18px 0 rgba(139, 92, 246, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 30px 4px rgba(139, 92, 246, 0.65);
+  }
+}
+
+/* Soft rolling wave separating the hero from the product grid */
+.store-wave::before {
+  content: "";
+  display: block;
+  height: 28px;
+  background: radial-gradient(circle at 50% 0, transparent 60%, currentColor 61%);
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-fade-up,
+  .store-pop,
+  .store-modal-in,
+  .store-glow {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ---------- Print / receipt layout ---------- */
+.print-only {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    margin: 6mm;
+  }
+}
