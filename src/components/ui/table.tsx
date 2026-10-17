@@ -22,6 +22,9 @@ interface TableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
+const HEAD_CLASS =
+  "whitespace-nowrap px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wider text-slate-500";
+
 export function Table<T>({
   columns,
   data,
@@ -35,18 +38,12 @@ export function Table<T>({
   const t = useT();
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white", className)}>
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
+            <tr className="border-b border-slate-200 bg-slate-50/80">
               {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={cn(
-                    "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500",
-                    col.className
-                  )}
-                >
+                <th key={col.key} className={cn(HEAD_CLASS, col.className)}>
                   {col.header}
                 </th>
               ))}
@@ -54,10 +51,10 @@ export function Table<T>({
           </thead>
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} className="border-b border-slate-100">
+              <tr key={i} className="border-b border-slate-100 last:border-0">
                 {columns.map((col) => (
                   <td key={col.key} className="px-4 py-3">
-                    <div className="h-4 animate-pulse rounded bg-slate-200 col-span-full" />
+                    <div className="h-4 animate-pulse rounded bg-slate-200" />
                   </td>
                 ))}
               </tr>
@@ -70,25 +67,19 @@ export function Table<T>({
 
   if (data.length === 0) {
     return (
-      <div className={cn("rounded-lg border border-slate-200 bg-white p-8 text-center", className)}>
+      <div className={cn("rounded-xl border border-slate-200 bg-white p-8 text-center", className)}>
         {empty ?? <EmptyState label={t.common.noData} description={t.common.noDataDescription} />}
       </div>
     );
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-slate-200 bg-white", className)}>
+    <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm", className)}>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50">
+          <tr className="border-b border-slate-200 bg-slate-50/80">
             {columns.map((col) => (
-              <th
-                key={col.key}
-                className={cn(
-                  "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500",
-                  col.className
-                )}
-              >
+              <th key={col.key} className={cn(HEAD_CLASS, col.className)}>
                 {col.header}
               </th>
             ))}
@@ -99,7 +90,7 @@ export function Table<T>({
             <tr
               key={keyExtractor(row)}
               className={cn(
-                "border-b border-slate-100 transition hover:bg-slate-50",
+                "border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80",
                 onRowClick && "cursor-pointer",
                 rowClassName?.(row)
               )}

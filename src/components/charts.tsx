@@ -18,22 +18,25 @@ export function StatCard({
   tone?: "slate" | "green" | "red" | "blue" | "amber" | "purple";
   icon?: ReactNode;
 }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600",
-    green: "bg-green-100 text-green-700",
-    red: "bg-red-100 text-red-700",
-    blue: "bg-blue-100 text-blue-700",
-    amber: "bg-amber-100 text-amber-700",
-    purple: "bg-purple-100 text-purple-700",
+  const tones: Record<string, { bubble: string; bar: string }> = {
+    slate: { bubble: "bg-slate-100 text-slate-600", bar: "bg-slate-300" },
+    green: { bubble: "bg-green-100 text-green-700", bar: "bg-green-400" },
+    red: { bubble: "bg-red-100 text-red-700", bar: "bg-red-400" },
+    blue: { bubble: "bg-blue-100 text-blue-700", bar: "bg-blue-500" },
+    amber: { bubble: "bg-amber-100 text-amber-700", bar: "bg-amber-400" },
+    purple: { bubble: "bg-purple-100 text-purple-700", bar: "bg-purple-400" },
   };
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-        {icon && <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg text-xs", tones[tone])}>{icon}</div>}
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      <span className={cn("absolute inset-x-0 top-0 h-1", tones[tone].bar)} aria-hidden="true" />
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 truncate pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        {icon && (
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs", tones[tone].bubble)}>{icon}</div>
+        )}
       </div>
-      <p className="mt-1.5 truncate text-xl font-bold text-slate-900">{value}</p>
-      {sub && <p className="mt-0.5 truncate text-xs text-slate-400">{sub}</p>}
+      <p className="mt-2 text-lg font-bold leading-tight tracking-tight text-slate-900 tabular-nums sm:text-xl">{value}</p>
+      {sub && <p className="mt-1 truncate text-[11px] text-slate-400">{sub}</p>}
     </div>
   );
 }
@@ -188,8 +191,8 @@ export function ChartCard({ title, children, actions }: {
   actions?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
         {actions}
       </div>

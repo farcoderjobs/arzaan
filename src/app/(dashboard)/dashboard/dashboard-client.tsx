@@ -104,16 +104,18 @@ export function DashboardClient({ userName, canSeeProfit, canSeeExpenses }: Dash
   return (
     <div className="mx-auto max-w-7xl">
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{tr.auth.welcomeBack}, {userName.split(" ")[0]}</h1>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+            {tr.auth.welcomeBack}, {userName.split(" ")[0]}
+          </h1>
           <p className="mt-1 text-sm text-slate-500">{tr.dashboard.title}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <select
             value={days}
             onChange={(e) => setDays(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none"
+            className="h-9 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:flex-none"
           >
             {ranges.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -121,7 +123,7 @@ export function DashboardClient({ userName, canSeeProfit, canSeeExpenses }: Dash
           </select>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm hover:bg-slate-50"
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" /> {tr.common.refresh}
           </button>
@@ -260,22 +262,22 @@ export function DashboardClient({ userName, canSeeProfit, canSeeExpenses }: Dash
 
           {/* Recent sales */}
           {data?.recentSales && data.recentSales.length > 0 && (
-            <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+            <div className="mt-6 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
                 <h3 className="text-sm font-semibold text-slate-700">{tr.dashboard.recentSales}</h3>
                 <Link href="/sales" className="text-xs font-medium text-blue-600 hover:underline">{tr.nav.sales} →</Link>
               </div>
               <ul className="divide-y divide-slate-100">
                 {data.recentSales.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
-                    <div className="flex items-center gap-3">
-                      <Link href={`/sales/${s.id}`} className="font-mono text-xs font-medium text-blue-600 hover:underline">{s.invoiceNumber}</Link>
+                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm sm:px-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Link href={`/sales/${s.id}`} className="truncate font-mono text-xs font-medium text-blue-600 hover:underline">{s.invoiceNumber}</Link>
                       <span className="hidden text-xs text-slate-400 sm:inline">
                         {new Date(s.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                         {s.cashierName ? ` · ${s.cashierName}` : ""}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                       <span className={cn(
                         "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
                         s.paymentMethod === "cash" ? "bg-green-100 text-green-700" :

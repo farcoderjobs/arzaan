@@ -143,8 +143,8 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
       <div className="no-print grid gap-6 lg:grid-cols-3">
         {/* Items + payments */}
         <div className="space-y-6 lg:col-span-2">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3">Item</th>

@@ -179,13 +179,13 @@ export function SettingsClient({ canManage }: SettingsClientProps) {
       <Breadcrumbs items={[{ label: "Settings" }]} />
       <PageHeader title="Settings" description="Store, POS and inventory configuration" />
 
-      <div className="mb-6 flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
+      <div className="no-scrollbar mb-5 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 sm:mb-6">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition",
+              "flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition",
               tab === t ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
             )}
           >
@@ -213,8 +213,8 @@ export function SettingsClient({ canManage }: SettingsClientProps) {
 
       {/* Branches tab */}
       {tab === "Branches" && (
-        <div className="rounded-xl border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="rounded-2xl border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-4 sm:px-5">
             <div>
               <h3 className="font-semibold text-slate-900">Branches</h3>
               <p className="text-xs text-slate-500">Users assigned to a branch can only access that branch&apos;s data</p>
@@ -229,7 +229,8 @@ export function SettingsClient({ canManage }: SettingsClientProps) {
           {branches.length === 0 ? (
             <EmptyState label="No branches" description="Create your first branch — a single default branch keeps the existing workflow." />
           ) : (
-            <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-400">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Branch</th>
@@ -269,6 +270,7 @@ export function SettingsClient({ canManage }: SettingsClientProps) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

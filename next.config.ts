@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   // same MongoClient" and queued offline sales never sync (500 on every
   // retry).
   serverExternalPackages: ["mongoose"],
+  // The dev badge is pinned bottom-left, where the POS mobile checkout bar
+  // sits — it swallowed taps on the cart button. Compile/runtime errors are
+  // still surfaced without it.
+  devIndicators: false,
   experimental: {
     serverActions: {
       bodySizeLimit: "5mb",

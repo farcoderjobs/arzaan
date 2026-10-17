@@ -217,8 +217,8 @@ export function NewReturnClient() {
             <Button variant="secondary" onClick={() => { setSale(null); setExistingReturns([]); }}>Change sale</Button>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3">Item</th>

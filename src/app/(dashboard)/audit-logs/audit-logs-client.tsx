@@ -147,8 +147,8 @@ export function AuditLogsClient() {
       ) : logs.length === 0 ? (
         <EmptyState label="No audit entries" description="Actions in the selected range will appear here." />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-semibold">Time</th>

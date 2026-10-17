@@ -17,18 +17,21 @@ export const FormField = forwardRef<HTMLDivElement, FieldProps>(
     return (
       <div ref={ref} {...rest}>
         {label && (
-          <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
             {label}
-            {required && <span className="ml-1 text-red-500">*</span>}
+            {required && <span className="ms-1 text-red-500">*</span>}
           </label>
         )}
         {children}
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-        {hint && !error && <p className="mt-1 text-sm text-slate-500">{hint}</p>}
+        {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
       </div>
     );
   }
 );
+
+const CONTROL_CLASS =
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
@@ -39,21 +42,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ c
     <input
       ref={ref}
       className={cn(
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
-        error ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "focus:border-slate-400",
+        CONTROL_CLASS,
+        error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
         className
       )}
       {...props}
     />
   );
-});interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "onChange" | "value"> {
+});
+
+interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "onChange" | "value"> {
   error?: string;
   options: Array<{ value: string; label: string }>;
   placeholder?: string;
   value?: string;
   /** Called with the selected option value (not the raw event). */
   onChange?: (value: string) => void;
-
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, error, options, placeholder, value, onChange, disabled, ...props }, ref) {
@@ -64,8 +68,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       disabled={disabled}
       onChange={onChange ? (e) => onChange(e.target.value) : undefined}
       className={cn(
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
-        error ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "focus:border-slate-400",
+        CONTROL_CLASS,
+        error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
         className
       )}
       {...props}
@@ -89,8 +93,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     <textarea
       ref={ref}
       className={cn(
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
-        error ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "focus:border-slate-400",
+        CONTROL_CLASS,
+        error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
         className
       )}
       {...props}
@@ -108,7 +112,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
       <input
         ref={ref}
         type="checkbox"
-        className={cn("h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500", className)}
+        className={cn("h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/40", className)}
         {...props}
       />
       {label}

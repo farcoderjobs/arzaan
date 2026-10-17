@@ -192,7 +192,8 @@ export function StoreReportClient() {
               <div className="border-b border-slate-200 px-4 py-3">
                 <h3 className="text-sm font-semibold text-slate-700">Top products</h3>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <th className="px-4 py-2.5">Product</th>
@@ -216,13 +217,15 @@ export function StoreReportClient() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-4 py-3">
                 <h3 className="text-sm font-semibold text-slate-700">Recent orders</h3>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <th className="px-4 py-2.5">Order</th>
@@ -256,6 +259,7 @@ export function StoreReportClient() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         </>

@@ -161,18 +161,18 @@ export function Storefront({
     <div className="store-root min-h-screen bg-slate-50 text-slate-900">
       {/* ---------- Header ---------- */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl text-lg font-black text-white shadow-md shadow-indigo-500/20 bg-gradient-to-br", accentFor("indigo").badge)}>
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:gap-4 sm:px-6 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-black text-white shadow-md shadow-indigo-500/20 bg-gradient-to-br sm:h-10 sm:w-10 sm:text-lg", accentFor("indigo").badge)}>
               {storeName.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <p className="text-base font-bold leading-tight text-slate-900">{storeName}</p>
-              <p className="text-[11px] leading-tight text-slate-500">Online Store</p>
+            <div className="min-w-0">
+              <p className="max-w-[46vw] truncate text-sm font-bold leading-tight text-slate-900 sm:max-w-none sm:text-base">{storeName}</p>
+              <p className="text-[10px] leading-tight text-slate-500 sm:text-[11px]">Online Store</p>
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             <a
               href="/login"
               className="hidden rounded-lg px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 sm:block"
@@ -181,7 +181,7 @@ export function Storefront({
             </a>
             <button
               onClick={() => setCartOpen(true)}
-              className="group relative flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-slate-800 active:scale-95"
+              className="group relative flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-slate-800 active:scale-95 sm:px-4"
               aria-label="Open cart"
             >
               <span className="transition-transform duration-200 group-hover:scale-110">🛒</span>
@@ -203,13 +203,13 @@ export function Storefront({
       {/* ---------- Hero ---------- */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-b from-indigo-50 via-white to-slate-50">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(15,23,42,0.06)_1px,transparent_0)] [background-size:22px_22px]" />
-        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+        <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16 lg:py-20">
           <p className="store-fade-up inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             Order online — we call you to confirm
           </p>
           <h1
-            className="store-fade-up mt-4 max-w-2xl text-3xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl"
+            className="store-fade-up mt-4 max-w-2xl text-[27px] font-extrabold leading-[1.12] tracking-tight text-slate-900 sm:text-5xl"
             style={{ animationDelay: "60ms" }}
           >
             Hand-picked products,{" "}
@@ -236,13 +236,13 @@ export function Storefront({
 
           {/* Category chips */}
           {categories.length > 0 && (
-            <div className="store-fade-up mt-4 flex flex-wrap gap-2" style={{ animationDelay: "240ms" }}>
+            <div className="store-fade-up no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" style={{ animationDelay: "240ms" }}>
               {["All", ...categories].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={cn(
-                    "rounded-full px-4 py-1.5 text-xs font-semibold transition duration-200 active:scale-95",
+                    "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition duration-200 active:scale-95",
                     activeCategory === cat
                       ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
                       : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
@@ -274,10 +274,10 @@ export function Storefront({
       </section>
 
       {/* ---------- Product grid ---------- */}
-      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
               {activeCategory === "All" ? "All products" : activeCategory}
             </h2>
             <p className="text-sm text-slate-500">
@@ -326,7 +326,7 @@ export function Storefront({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
             {visibleProducts.map((product, i) => {
               const accent = accentFor(product.accent);
               const inCart = qtyOf(product.id);
@@ -337,7 +337,7 @@ export function Storefront({
                   style={{ animationDelay: `${Math.min(i * 60, 480)}ms` }}
                 >
                   {/* Art */}
-                  <div className={cn("relative h-44 overflow-hidden bg-gradient-to-br", accent.art)}>
+                  <div className={cn("relative h-28 overflow-hidden bg-gradient-to-br sm:h-44", accent.art)}>
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -347,52 +347,52 @@ export function Storefront({
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <span className="text-6xl drop-shadow-sm transition duration-500 group-hover:scale-110">
+                        <span className="text-4xl drop-shadow-sm transition duration-500 group-hover:scale-110 sm:text-6xl">
                           {emojiFor(product.category, product.name)}
                         </span>
                       </div>
                     )}
                     {product.featured && (
-                      <span className="absolute left-3 top-3 rounded-full bg-amber-400 px-2.5 py-0.5 text-[11px] font-bold text-amber-950 shadow-sm">
+                      <span className="absolute start-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950 shadow-sm sm:start-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
                         ⭐ Featured
                       </span>
                     )}
                     {!product.inStock && (
-                      <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                      <span className="absolute end-2 top-2 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm sm:end-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
                         Sold out
                       </span>
                     )}
                     {product.inStock && product.stock <= 5 && (
-                      <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 shadow-sm ring-1 ring-amber-200">
+                      <span className="absolute end-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-700 shadow-sm ring-1 ring-amber-200 sm:end-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
                         Only {product.stock} left
                       </span>
                     )}
                   </div>
 
                   {/* Body */}
-                  <div className="flex flex-1 flex-col p-5">
-                    <span className={cn("self-start rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1", accent.chip)}>
+                  <div className="flex flex-1 flex-col p-3 sm:p-5">
+                    <span className={cn("line-clamp-1 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 sm:px-2.5 sm:text-[11px]", accent.chip)}>
                       {product.category}
                     </span>
-                    <h3 className="mt-2.5 text-base font-bold text-slate-900 transition group-hover:text-indigo-700">
+                    <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-snug text-slate-900 transition group-hover:text-indigo-700 sm:mt-2.5 sm:text-base">
                       {product.name}
                     </h3>
                     {product.description && (
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{product.description}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500 sm:text-xs">{product.description}</p>
                     )}
 
-                    <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-                      <div>
-                        <p className="text-lg font-black text-slate-900">{money(product.price)}</p>
+                    <div className="mt-auto flex flex-col items-stretch gap-2 pt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-3 sm:pt-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-black text-slate-900 sm:text-lg">{money(product.price)}</p>
                         {product.compareAtPrice > product.price && (
-                          <p className="text-xs text-slate-400 line-through">{money(product.compareAtPrice)}</p>
+                          <p className="truncate text-[11px] text-slate-400 line-through sm:text-xs">{money(product.compareAtPrice)}</p>
                         )}
                       </div>
                       <button
                         onClick={() => addToCart(product)}
                         disabled={!product.inStock}
                         className={cn(
-                          "rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition duration-200 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none",
+                          "w-full rounded-xl px-3 py-2 text-xs font-bold text-white shadow-sm transition duration-200 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm",
                           accent.button
                         )}
                       >
@@ -531,10 +531,10 @@ export function Storefront({
 
       {/* ---------- Checkout modal ---------- */}
       {checkoutOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="store-modal-in flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="store-modal-in flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl">
             {placedOrder ? (
-              <div className="p-8 text-center">
+              <div className="p-6 text-center sm:p-8">
                 <div className="store-pop mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-4xl">✅</div>
                 <h2 className="mt-4 text-2xl font-black text-slate-900">Order placed!</h2>
                 <p className="mt-2 text-sm text-slate-600">
@@ -725,7 +725,7 @@ function CheckoutForm({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 p-5">
+      <div className="pb-safe border-t border-slate-200 p-5">
         <button
           onClick={submit}
           disabled={placing || cart.length === 0}

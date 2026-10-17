@@ -143,6 +143,8 @@ export function PosClient({
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
+  // On phones the cart lives in a bottom sheet instead of a side column.
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [saleDiscount, setSaleDiscount] = useState("0");
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [saleNote, setSaleNote] = useState("");
@@ -739,22 +741,22 @@ export function PosClient({
   }, [receipt, autoPrint]);
 
   return (
-    <div className="flex h-full flex-col gap-4" data-pos>
+    <div className="flex min-h-0 flex-col gap-3 lg:h-full lg:gap-4" data-pos>
       {/* Top bar: search + scanner + category filter */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[260px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap sm:items-center sm:gap-3">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-0">
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onSearchKeyDown}
             placeholder={`${tr.pos.scanBarcode} (F2)`}
-            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-4 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pe-4 ps-9 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             autoFocus
           />
         </div>
-        <div className="w-48">
+        <div className="min-w-0 flex-1 sm:w-48 sm:flex-none">
           <Select
             value={categoryFilter}
             onChange={setCategoryFilter}
@@ -763,7 +765,7 @@ export function PosClient({
             className="w-full"
           />
         </div>
-        <Button variant="secondary" onClick={openHeld} title="F8">
+        <Button variant="secondary" onClick={openHeld} title="F8" className="shrink-0">
           {tr.pos.resumeHeld} {heldSales.length > 0 && `(${heldSales.length})`}
         </Button>
       </div>
@@ -779,13 +781,13 @@ export function PosClient({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         {/* Product grid */}
-        <div className="min-w-0 flex-1 overflow-auto">
+        <div className="min-w-0 flex-1 pb-24 lg:overflow-y-auto lg:pb-0">
           {catalogLoading ? (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-100" />
+                <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100 sm:h-28" />
               ))}
             </div>
           ) : products.length === 0 ? (
@@ -793,14 +795,14 @@ export function PosClient({
               {tr.common.noData}. {tr.pos.scanBarcode}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
               {products.map((p) => (
                 <button
                   key={p._id}
                   onClick={() => addToCart(p)}
                   disabled={p.currentStock <= 0}
                   className={cn(
-                    "flex h-28 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-400 hover:shadow",
+                    "flex h-24 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 text-start shadow-sm transition hover:border-blue-400 hover:shadow-md active:scale-[0.99] sm:h-28",
                     p.currentStock <= 0 && "opacity-50"
                   )}
                 >
@@ -808,8 +810,8 @@ export function PosClient({
                     <p className="truncate text-sm font-medium text-slate-900">{p.name}</p>
                     <p className="truncate text-xs text-slate-400">{p.sku}</p>
                   </div>
-                  <div className="flex items-end justify-between w-full">
-                    <span className="text-sm font-semibold text-blue-700">{money(effectivePrice(p))}</span>
+                  <div className="flex w-full items-end justify-between gap-1">
+                    <span className="truncate text-sm font-semibold text-blue-700">{money(effectivePrice(p))}</span>
                     <span className={cn("text-xs", p.currentStock <= 0 ? "text-red-500" : "text-slate-400")}>
                       {p.currentStock <= 0 ? tr.dashboard.outOfStock : `${p.currentStock} ${tr.products.stock}`}
                     </span>
@@ -820,15 +822,41 @@ export function PosClient({
           )}
         </div>
 
-        {/* Cart panel */}
-        <div className="flex w-[380px] shrink-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* Mobile cart backdrop */}
+        {mobileCartOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-sm lg:hidden"
+            onClick={() => setMobileCartOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Cart panel — side column on desktop, bottom sheet on phones. */}
+        <aside
+          className={cn(
+            "z-40 flex flex-col border border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out",
+            mobileCartOpen ? "translate-y-0" : "pointer-events-none translate-y-full",
+            "fixed inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl",
+            "lg:pointer-events-auto lg:static lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0 lg:rounded-2xl lg:shadow-sm"
+          )}
+        >
+          <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-slate-200 lg:hidden" />
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <p className="font-semibold text-slate-900">{tr.pos.cart} ({cart.length})</p>
-            {cart.length > 0 && (
-              <button onClick={clearCart} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50">
-                <Trash className="h-3.5 w-3.5" /> {tr.common.clear}
+            <div className="flex items-center gap-1">
+              {cart.length > 0 && (
+                <button onClick={clearCart} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 transition hover:bg-red-50">
+                  <Trash className="h-3.5 w-3.5" /> {tr.common.clear}
+                </button>
+              )}
+              <button
+                onClick={() => setMobileCartOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+                aria-label="Close cart"
+              >
+                <X className="h-4 w-4" />
               </button>
-            )}
+            </div>
           </div>
 
           {/* Customer row */}
@@ -943,14 +971,42 @@ export function PosClient({
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3">
+          <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3 pb-safe lg:pb-3">
             <Button variant="secondary" onClick={holdSale} disabled={cart.length === 0 || submitting} title="F7">
               {tr.pos.holdSale} (F7)
             </Button>
-            <Button onClick={openPayment} disabled={cart.length === 0 || submitting} title="F4">
+            <Button onClick={() => { setMobileCartOpen(false); openPayment(); }} disabled={cart.length === 0 || submitting} title="F4">
               {tr.pos.payment} (F4)
             </Button>
           </div>
+        </aside>
+      </div>
+
+      {/* Mobile checkout bar — totals and payment stay one thumb-tap away. */}
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+        <div className="flex items-center gap-2 pb-2">
+          <button
+            type="button"
+            onClick={() => setMobileCartOpen(true)}
+            className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-sm font-semibold text-slate-700 transition active:scale-95"
+            aria-label={`${tr.pos.cart} (${cart.length})`}
+          >
+            <span aria-hidden="true">🛒</span>
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          </button>
+          <div className="min-w-0 flex-1 text-end">
+            <p className="truncate text-base font-bold leading-tight text-slate-900">{money(totals.total)}</p>
+            <p className="truncate text-[11px] text-slate-500">{tr.pos.cart}</p>
+          </div>
+          <Button
+            onClick={() => { setMobileCartOpen(false); openPayment(); }}
+            disabled={cart.length === 0 || submitting}
+            className="h-11 shrink-0 px-5"
+          >
+            {tr.pos.payment} (F4)
+          </Button>
         </div>
       </div>
 

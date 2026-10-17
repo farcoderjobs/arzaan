@@ -184,8 +184,8 @@ export function ProfitReportClient() {
             </ChartCard>
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full border-collapse text-sm">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3 text-left">Day</th>

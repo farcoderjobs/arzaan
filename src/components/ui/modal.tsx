@@ -50,43 +50,48 @@ export function Modal({
   if (!open) return null;
 
   const sizes = {
-    sm: "max-w-sm",
-    md: "max-w-lg",
-    lg: "max-w-2xl",
-    xl: "max-w-4xl",
+    sm: "sm:max-w-sm",
+    md: "sm:max-w-lg",
+    lg: "sm:max-w-2xl",
+    xl: "sm:max-w-4xl",
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={closeOnOverlayClick ? handleClose : undefined} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+      <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={closeOnOverlayClick ? handleClose : undefined} />
       <div
         ref={dialogRef}
         className={cn(
-          "relative z-10 flex max-h-[calc(100vh-2rem)] w-full flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200",
+          "relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:p-6",
           sizes[size]
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? "modal-title" : undefined}
       >
         <button
           onClick={handleClose}
-          className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          className="absolute end-3 top-3 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 sm:end-4 sm:top-4"
           aria-label="Close"
         >
           <X className="h-5 w-5" />
         </button>
 
         {(title || description) && (
-          <div className="mb-4 shrink-0 pr-8">
-            {title && <h2 className="text-lg font-semibold text-slate-900">{title}</h2>}
+          <div className="mb-4 shrink-0 pe-8">
+            {title && <h2 id="modal-title" className="text-lg font-semibold text-slate-900">{title}</h2>}
             {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
         )}
 
         {/* Scrollable body: modals taller than the viewport scroll here. */}
-        <div className="mb-4 min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
 
-        {footer && <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 pt-4">{footer}</div>}
+        {footer && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4 [&>*]:grow sm:[&>*]:grow-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
