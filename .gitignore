@@ -54,3 +54,4 @@ blob-report/
 
 # scratch dev script
 /monitor-tmp.mjs
+/.db-backup/
