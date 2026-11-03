@@ -27,22 +27,51 @@ const checkoutSchema = z.object({
         productId: z.string().min(1),
         quantity: z.number().int().min(1).max(10000),
         unitDiscount: z.number().min(0).default(0),
+        /** Per-line price tier; omitted lines use the sale-level tier. */
+        pricingMode: z.enum(["retail", "wholesale"]).optional(),
       })
     )
-    .min(1, "At least one item is required"),
+    .default([]),
+  /** Direct items: bought in the market, sold without entering stock. */
+  directItems: z
+    .array(
+      z.object({
+        description: z.string().trim().min(1, "Description is required").max(200),
+        quantity: z.number().int().min(1).max(10000),
+        unitPrice: z.number().min(0.01, "Selling price must be greater than zero"),
+        unitCost: z.number().min(0).default(0),
+        taxRate: z.number().min(0).max(100).default(0),
+      })
+    )
+    .max(50)
+    .default([]),
   discount: z.number().min(0).default(0),
   discountType: z.enum(["amount", "percent"]).default("amount"),
+  /** Explicit price tier. Authorization and eligibility are checked server-side. */
+  pricingMode: z.enum(["retail", "wholesale"]).default("retail"),
+  /** Whether the customer's earned reward credit is granted (once per sale). */
+  grantBonus: z.boolean().default(true),
+  /** Employee purchase: the staff member the sale is for (benefit is server-side). */
+  employeePurchase: z
+    .object({ employeeId: z.string().refine((v) => mongoose.Types.ObjectId.isValid(v), "Invalid employee") })
+    .nullable()
+    .default(null),
   payments: z
     .array(
       z.object({
-        method: z.enum(["cash", "card", "transfer", "credit"]),
-        amount: z.number().positive(),
+        method: z.enum(["cash", "card", "transfer", "credit", "bonus"]),
+        // Zero is allowed so an employee purchase can be put entirely on the
+        // employee's account (settled later in Employee purchases / payroll).
+        amount: z.number().min(0),
         reference: z.string().max(200).default(""),
       })
     )
     .default([]),
   note: z.string().max(500).default(""),
   status: z.enum(["completed", "held"]).default("completed"),
+}).refine((data) => data.items.length + data.directItems.length > 0, {
+  message: "At least one item is required",
+  path: ["items"],
 });
 
 export async function POST(req: NextRequest) {
@@ -94,6 +123,9 @@ export async function POST(req: NextRequest) {
               changeAmount: existing.changeAmount,
               status: existing.status,
               creditUsed: 0,
+              pricingMode: existing.pricingMode ?? "retail",
+              bonusEarned: existing.bonusEarned ?? 0,
+              bonusRedeemed: existing.bonusRedeemed ?? 0,
             },
             message: "Sale already processed",
           },
@@ -117,23 +149,72 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(badRequest("Credit sales require a selected customer"), { status: 400 });
     }
 
-    // Settings enforcement: cashiers cannot exceed the configured maximum percent discount
-    if (data.discountType === "percent" && data.discount > settings.maxCashierDiscountPercent) {
+    // Settings enforcement: cashiers cannot exceed the configured maximum percent discount.
+    // Applies to the sale-level discount and to every line-level percent discount.
+    if (data.discountType === "percent") {
+      const maxPercent = settings.maxCashierDiscountPercent;
+      if (data.discount > maxPercent) {
+        return NextResponse.json(
+          badRequest(`Discount ${data.discount}% exceeds the maximum allowed (${maxPercent}%)`),
+          { status: 400 }
+        );
+      }
+      const overLine = data.items.find((i) => i.unitDiscount > maxPercent);
+      if (overLine) {
+        return NextResponse.json(
+          badRequest(`Item discount ${overLine.unitDiscount}% exceeds the maximum allowed (${maxPercent}%)`),
+          { status: 400 }
+        );
+      }
+    }
+
+    // Wholesale pricing is a server-authorised price tier, never a client claim.
+    const wholesaleAuthorized = await hasPermission(user, PERMISSIONS.sales.wholesale);
+    // Any wholesale line (even inside a retail sale) needs the permission.
+    const wholesaleLines = data.items.filter((i) => i.pricingMode === "wholesale").length;
+    if ((data.pricingMode === "wholesale" || wholesaleLines > 0) && !wholesaleAuthorized) {
       return NextResponse.json(
-        badRequest(`Discount ${data.discount}% exceeds the maximum allowed (${settings.maxCashierDiscountPercent}%)`),
-        { status: 400 }
+        forbidden("You do not have permission to apply wholesale pricing"),
+        { status: 403 }
       );
     }
 
     // Merge duplicate product lines so stock math is correct
-    const merged = new Map<string, { quantity: number; unitDiscount: number }>();
+    const merged = new Map<string, { quantity: number; unitDiscount: number; pricingMode?: "retail" | "wholesale" }>();
     for (const item of data.items) {
       const existing = merged.get(item.productId);
       if (existing) {
         existing.quantity += item.quantity;
         existing.unitDiscount += item.unitDiscount;
+        // A line is wholesale if any of its merged rows asked for wholesale.
+        if (item.pricingMode === "wholesale") existing.pricingMode = "wholesale";
       } else {
-        merged.set(item.productId, { quantity: item.quantity, unitDiscount: item.unitDiscount });
+        merged.set(item.productId, {
+          quantity: item.quantity,
+          unitDiscount: item.unitDiscount,
+          pricingMode: item.pricingMode,
+        });
+      }
+    }
+
+    // Expired-stock overrides are a server-side decision: the permission is
+    // checked here and never trusted from the client payload.
+    const allowExpired = await hasPermission(user, PERMISSIONS.sales.overrideExpired);
+
+    // Employee purchases are processed on behalf of a staff member. The
+    // benefit rate itself always comes from the server-side configuration.
+    if (data.employeePurchase) {
+      const mayProcess = await hasPermission(user, PERMISSIONS.employeePurchases.process);
+      const mayApplyBenefit = await hasPermission(user, PERMISSIONS.employeePurchases.applyBenefit);
+      if (!mayProcess || !mayApplyBenefit) {
+        return NextResponse.json(forbidden("You do not have permission to process employee purchases"), {
+          status: 403,
+        });
+      }
+      if (data.customerId) {
+        return NextResponse.json(badRequest("An employee purchase cannot also be billed to a customer"), {
+          status: 400,
+        });
       }
     }
 
@@ -142,12 +223,20 @@ export async function POST(req: NextRequest) {
       customerId: data.customerId,
       cashierId: user.id,
       items: [...merged.entries()].map(([productId, v]) => ({ productId, ...v })),
+      directItems: data.directItems,
       discount: data.discount,
       discountType: data.discountType,
-      payments: data.payments,
+      pricingMode: data.pricingMode,
+      wholesaleAuthorized,
+      grantBonus: data.grantBonus,
+      employeePurchase: data.employeePurchase,
+      employeeBenefitAuthorized: Boolean(data.employeePurchase),
+      // Zero tenders are dropped here: the sale stores only money that moved.
+      payments: data.payments.filter((p) => p.amount > 0),
       note: data.note,
       status: data.status,
       clientTransactionId: data.clientTransactionId ?? null,
+      allowExpired,
     });
 
     await recordAuditLog({
@@ -155,9 +244,83 @@ export async function POST(req: NextRequest) {
       action: data.status === "held" ? "sale.hold" : "sale.create",
       entityType: "Sale",
       entityId: result.id,
-      newValue: { invoiceNumber: result.invoiceNumber, total: result.total, paidAmount: result.paidAmount, creditUsed: result.creditUsed },
+      newValue: {
+        invoiceNumber: result.invoiceNumber,
+        total: result.total,
+        paidAmount: result.paidAmount,
+        creditUsed: result.creditUsed,
+        pricingMode: result.pricingMode,
+        wholesaleItems: result.wholesaleLines,
+        bonusGranted: result.bonusGranted,
+        bonusEarned: result.bonusEarned,
+        bonusRedeemed: result.bonusRedeemed,
+        directItems: data.directItems.length,
+        expiredOverride: result.expiredOverride,
+      },
       ...meta,
     });
+
+    if (result.wholesaleLines > 0) {
+      await recordAuditLog({
+        user,
+        action: "sale.wholesale_pricing",
+        entityType: "Sale",
+        entityId: result.id,
+        newValue: {
+          invoiceNumber: result.invoiceNumber,
+          wholesaleItems: result.wholesaleLines,
+          pricingMode: result.pricingMode,
+        },
+        note: `Wholesale price applied to ${result.wholesaleLines} item(s) on ${result.invoiceNumber}`,
+        ...meta,
+      });
+    }
+
+    if (result.bonusGranted && result.bonusEarned > 0) {
+      await recordAuditLog({
+        user,
+        action: "sale.bonus_granted",
+        entityType: "Sale",
+        entityId: result.id,
+        newValue: {
+          invoiceNumber: result.invoiceNumber,
+          customerId: data.customerId,
+          bonusEarned: result.bonusEarned,
+        },
+        note: `Reward credit of ${result.bonusEarned} granted on ${result.invoiceNumber}`,
+        ...meta,
+      });
+    }
+
+    if (result.employeePurchase) {
+      await recordAuditLog({
+        user,
+        action: "employee_purchase.create",
+        entityType: "EmployeePurchase",
+        entityId: result.id,
+        newValue: {
+          invoiceNumber: result.invoiceNumber,
+          employeeId: result.employeePurchase.employeeId,
+          benefitPercent: result.employeePurchase.benefitPercent,
+          benefitAmount: result.employeePurchase.benefitAmount,
+          netAmount: result.employeePurchase.netAmount,
+          outstanding: result.employeePurchase.outstanding,
+        },
+        note: `Employee purchase for ${result.employeePurchase.employeeName} on ${result.invoiceNumber}`,
+        ...meta,
+      });
+    }
+
+    if (result.expiredOverride) {
+      await recordAuditLog({
+        user,
+        action: "sale.expired_override",
+        entityType: "Sale",
+        entityId: result.id,
+        note: `Expired stock sold on ${result.invoiceNumber} under sales.override_expired`,
+        ...meta,
+      });
+    }
 
     return NextResponse.json(
       {
@@ -174,9 +337,53 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // Two requests carrying the same clientTransactionId raced: the unique
+    // partial index rejected the loser. The sale IS saved, so report the one
+    // that won instead of failing a sale that exists.
+    if (isDuplicateKeyError(error)) {
+      try {
+        const body = (await req.clone().json()) as { clientTransactionId?: string };
+        const id = typeof body?.clientTransactionId === "string" ? body.clientTransactionId : "";
+        if (id) {
+          const existing = await Sale.findOne({ clientTransactionId: id }).lean();
+          if (existing) {
+            return NextResponse.json({
+              success: true,
+              alreadySynced: true,
+              data: {
+                id: existing._id.toString(),
+                invoiceNumber: existing.invoiceNumber,
+                total: existing.total,
+                paidAmount: existing.paidAmount,
+                changeAmount: existing.changeAmount,
+                status: existing.status,
+                creditUsed: 0,
+                pricingMode: existing.pricingMode ?? "retail",
+                bonusEarned: existing.bonusEarned ?? 0,
+                bonusRedeemed: existing.bonusRedeemed ?? 0,
+                bonusBalance: undefined,
+                expiredOverride: false,
+              },
+              message: "Sale already recorded",
+            });
+          }
+        }
+      } catch {
+        // fall through to the generic error
+      }
+    }
     console.error("POST /api/sales error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === 11000
+  );
 }
 
 /**

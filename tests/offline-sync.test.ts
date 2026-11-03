@@ -1,415 +1,264 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import "fake-indexeddb/auto";
+import { describe, expect, it } from "vitest";
+import type { ISyncOutboxDocument } from "../src/models";
 import {
   BACKOFF_SCHEDULE_MS,
   backoffDelayMs,
   isDue,
+  newRowKey,
   nextAttemptAt,
-  offlineReference,
-  newClientTransactionId,
-} from "../src/lib/offline/backoff";
-import {
-  addConflict,
-  cacheCatalog,
-  countUnsynced,
-  enqueueSale,
-  findCachedProductByBarcode,
-  getCachedCategories,
-  getCachedCustomers,
-  getCachedProducts,
-  getOfflineSoldQuantities,
-  getQueuedSale,
-  listConflicts,
-  listLocalSales,
-  listPendingQueue,
-  markSynced,
-  resetOfflineDb,
-  resolveConflict,
-  setMeta,
-  getMeta,
-  upsertCachedCustomers,
-  upsertCachedProducts,
-  type QueuedSale,
-} from "../src/lib/offline/db";
-import { syncNow, retryEntry } from "../src/lib/offline/sync-engine";
-import { setConnectionStatus } from "../src/lib/offline/connectivity";
+  summarise,
+} from "../src/lib/sync/backoff";
+import { buildPushOperations } from "../src/lib/sync/payload";
+import { COLLECTION_POLICY, policyFor, priorityFor, stripForSync } from "../src/lib/sync/policy";
+import { describeSyncState } from "../src/lib/sync/status-types";
+import type { SyncStatus } from "../src/lib/sync/status-types";
+import { LOCAL_MIGRATIONS, LOCAL_SCHEMA_VERSION } from "../src/lib/sync/local-migrations";
+import { newClientTransactionId } from "../src/lib/sync/client-ids";
+import { newRowKey as uniqueRowKey } from "../src/lib/sync/backoff";
 
-/* ------------------------------------------------------------------ */
+/**
+ * Unit coverage for the offline-first pipeline's pure logic.
+ *
+ * The parts that need a database (applying rows, cursors, migrations) are
+ * covered by tests/integration/09-offline-sync.test.ts against the real API.
+ */
 
-function queuedSale(over: Partial<QueuedSale> = {}): QueuedSale {
+function outboxRow(overrides: Record<string, unknown> = {}): ISyncOutboxDocument {
   return {
-    clientTransactionId: newClientTransactionId(),
+    rowKey: "row-1",
+    collectionName: "sales",
+    docId: "64b7f9c2e1a2b3c4d5e6f7a8",
+    operation: "upsert",
+    priority: 70,
     status: "PENDING",
-    createdAt: Date.now(),
-    nextAttemptAt: Date.now(),
     attempts: 0,
+    nextAttemptAt: 0,
     lastError: null,
-    offlineRef: offlineReference(),
-    total: 100,
-    itemCount: 2,
-    syncedInvoiceNumber: null,
+    actorUserId: null,
+    branchId: null,
+    entityType: "Sale",
+    docVersion: new Date("2026-10-01T10:00:00Z"),
     syncedAt: null,
-    payload: {
-      customerId: null,
-      items: [{ productId: "p1", quantity: 2, unitDiscount: 0 }],
-      discount: 0,
-      discountType: "amount",
-      payments: [{ method: "cash", amount: 100, reference: "" }],
-      note: "",
-      status: "completed",
-      deviceId: "device-1",
-    },
-    ...over,
-  };
+    ...overrides,
+  } as unknown as ISyncOutboxDocument;
 }
 
-const fetchMock = vi.fn();
-
-beforeEach(async () => {
-  await resetOfflineDb();
-  fetchMock.mockReset();
-  vi.stubGlobal("fetch", fetchMock);
-  setConnectionStatus("ONLINE");
-});
-
-afterEach(async () => {
-  await resetOfflineDb();
-  vi.unstubAllGlobals();
-});
-
-/* ----------------------------- backoff ------------------------------ */
-
-describe("backoff schedule", () => {
-  it("follows the 30s → 60s → 2m → 5m schedule and caps at 5m", () => {
+describe("retry backoff", () => {
+  it("escalates 30s → 60s → 2m → 5m and stays capped", () => {
     expect(BACKOFF_SCHEDULE_MS).toEqual([30_000, 60_000, 120_000, 300_000]);
+    expect(backoffDelayMs(0)).toBe(0);
     expect(backoffDelayMs(1)).toBe(30_000);
     expect(backoffDelayMs(2)).toBe(60_000);
     expect(backoffDelayMs(3)).toBe(120_000);
     expect(backoffDelayMs(4)).toBe(300_000);
-    expect(backoffDelayMs(5)).toBe(300_000); // capped
-    expect(backoffDelayMs(50)).toBe(300_000);
-    expect(backoffDelayMs(0)).toBe(0);
+    expect(backoffDelayMs(9)).toBe(300_000);
   });
 
-  it("nextAttemptAt = failedAt + delay", () => {
-    expect(nextAttemptAt(1, 1_000_000)).toBe(1_030_000);
-    expect(nextAttemptAt(3, 0)).toBe(120_000);
+  it("schedules the next attempt relative to the failure time", () => {
+    const failedAt = Date.UTC(2026, 9, 1, 12, 0, 0);
+    expect(nextAttemptAt(1, failedAt)).toBe(failedAt + 30_000);
+    expect(nextAttemptAt(4, failedAt)).toBe(failedAt + 300_000);
   });
 
-  it("isDue honors backoff windows and never retries SYNCED", () => {
-    const now = 10_000;
-    expect(isDue({ status: "PENDING", nextAttemptAt: now - 1 }, now)).toBe(true);
-    expect(isDue({ status: "PENDING", nextAttemptAt: now + 1 }, now)).toBe(false);
-    expect(isDue({ status: "FAILED", nextAttemptAt: now - 1 }, now)).toBe(true);
+  it("only considers pending rows that are due", () => {
+    const now = Date.UTC(2026, 9, 1, 12, 0, 0);
+    expect(isDue({ status: "PENDING", nextAttemptAt: now }, now)).toBe(true);
+    expect(isDue({ status: "PENDING", nextAttemptAt: now + 1_000 }, now)).toBe(false);
+    expect(isDue({ status: "SENDING", nextAttemptAt: now }, now)).toBe(true);
+    // A FAILED row waits for a human — it never auto-retries.
+    expect(isDue({ status: "FAILED", nextAttemptAt: 0 }, now)).toBe(false);
     expect(isDue({ status: "SYNCED", nextAttemptAt: 0 }, now)).toBe(false);
   });
-});
 
-describe("offline references and idempotency keys", () => {
-  it("offlineReference matches OFFLINE-YYYYMMDD-NNNNNN", () => {
-    const ref = offlineReference(new Date("2026-10-08T12:00:00Z"));
-    expect(ref).toMatch(/^OFFLINE-\d{8}-\d{6}$/);
-    expect(ref.startsWith("OFFLINE-20261008")).toBe(true);
-  });
-
-  it("newClientTransactionId generates unique ids", () => {
-    const ids = new Set(Array.from({ length: 500 }, () => newClientTransactionId()));
-    expect(ids.size).toBe(500);
-    const first = newClientTransactionId();
-    expect(first.length).toBeGreaterThanOrEqual(8);
+  it("summarises a run in operator language", () => {
+    expect(summarise({ pushed: 3, failed: 0, conflicted: 0, remaining: 0 })).toBe("3 pushed, 0 pending");
+    expect(summarise({ pushed: 2, failed: 1, conflicted: 2, remaining: 5 })).toContain("2 conflicted");
   });
 });
 
-/* ------------------------------ db layer ---------------------------- */
-
-describe("IndexedDB queue", () => {
-  it("enqueues a sale and reports it as unsynced", async () => {
-    await enqueueSale(queuedSale());
-    expect(await countUnsynced()).toBe(1);
-    const list = await listPendingQueue();
-    expect(list).toHaveLength(1);
-    expect(list[0].status).toBe("PENDING");
+describe("idempotency keys", () => {
+  it("produces unique replication keys", () => {
+    const keys = new Set(Array.from({ length: 200 }, () => newRowKey()));
+    expect(keys.size).toBe(200);
   });
 
-  it("keeps local receipt history for every queued sale", async () => {
-    const sale = queuedSale({ total: 250, itemCount: 3 });
-    await enqueueSale(sale);
-    const history = await listLocalSales();
-    expect(history).toHaveLength(1);
-    expect(history[0].total).toBe(250);
-    expect(history[0].itemCount).toBe(3);
+  it("produces unique client transaction ids for POS sales", () => {
+    const ids = new Set(Array.from({ length: 200 }, () => newClientTransactionId()));
+    expect(ids.size).toBe(200);
+    expect(uniqueRowKey()).not.toBe(newRowKey());
+  });
+});
+
+describe("replication policy", () => {
+  it("never replicates session or password-reset material", () => {
+    const user = {
+      _id: "abc",
+      email: "cashier@example.com",
+      passwordHash: "$2a$10$hash",
+      refreshTokenHash: "session",
+      passwordResetTokenHash: "reset",
+      passwordResetExpires: new Date(),
+    };
+    const stripped = stripForSync(user, "users");
+    expect(stripped.refreshTokenHash).toBeUndefined();
+    expect(stripped.passwordResetTokenHash).toBeUndefined();
+    expect(stripped.passwordResetExpires).toBeUndefined();
+    // Password HASHES travel: a shop must be able to verify an offline login.
+    expect(stripped.passwordHash).toBe("$2a$10$hash");
   });
 
-  it("markSynced updates the queue AND the local history (invoice replaces offline ref)", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-    await markSynced(sale.clientTransactionId, "INV-00042");
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("SYNCED");
-    expect(entry?.syncedInvoiceNumber).toBe("INV-00042");
-    expect(await countUnsynced()).toBe(0);
-    const history = await listLocalSales();
-    expect(history[0].syncedInvoiceNumber).toBe("INV-00042");
-    expect(history[0].offlineRef).toBe(sale.offlineRef); // audit trail kept
+  it("refuses collections outside the replication table", () => {
+    expect(policyFor("syncoutboxes")).toBeNull();
+    expect(policyFor("sale")).toBeNull();
+    expect(stripForSync({ _id: "x" }, "unknown")).toEqual({ _id: "x" });
   });
 
-  it("offline stock deduction only counts completed sales still pending/syncing", async () => {
-    await enqueueSale(queuedSale({ clientTransactionId: "a-1" })); // completed PENDING
-    await enqueueSale(
-      queuedSale({
-        clientTransactionId: "a-2",
-        payload: { ...queuedSale().payload, status: "held" },
-      })
-    );
-    await enqueueSale(
-      queuedSale({
-        clientTransactionId: "a-3",
-        status: "FAILED",
-        payload: {
-          ...queuedSale().payload,
-          items: [{ productId: "p1", quantity: 99, unitDiscount: 0 }],
-        },
-      })
-    );
-    const sold = await getOfflineSoldQuantities();
-    expect(sold.get("p1")).toBe(2); // only the pending completed sale
-    await markSynced("a-1", "INV-1");
-    const after = await getOfflineSoldQuantities();
-    expect(after.get("p1")).toBeUndefined(); // synced → server stock already reflects it
+  it("orders pushes so references land before the records that use them", () => {
+    expect(priorityFor("products")).toBeLessThan(priorityFor("inventorymovements"));
+    expect(priorityFor("inventorymovements")).toBeLessThan(priorityFor("sales"));
+    expect(priorityFor("sales")).toBeLessThan(priorityFor("cashtransactions"));
+    expect(priorityFor("unknown-collection")).toBeGreaterThan(priorityFor("auditlogs"));
   });
 
-  it("records sync conflicts and can resolve them", async () => {
-    await addConflict({
-      id: "c1",
-      clientTransactionId: "x",
-      kind: "STOCK_CONFLICT",
-      productId: "p1",
-      message: "INSUFFICIENT_STOCK: Insufficient stock for Cola",
-      createdAt: Date.now(),
-      resolved: false,
+  it("marks transactional history append-only and reference data center-authoritative", () => {
+    expect(COLLECTION_POLICY.sales.appendOnly).toBe(false);
+    expect(COLLECTION_POLICY.inventorymovements.appendOnly).toBe(true);
+    expect(COLLECTION_POLICY.products.centerAuthoritative).toBe(true);
+    expect(COLLECTION_POLICY.sales.centerAuthoritative).toBe(false);
+  });
+});
+
+describe("push payload building", () => {
+  const doc = { _id: "64b7f9c2e1a2b3c4d5e6f7a8", invoiceNumber: "INV-1", total: 10, __v: 3 };
+
+  it("collapses repeated dirty markers for one document into a single operation", async () => {
+    const rows = [
+      outboxRow({ rowKey: "row-a", createdAt: new Date(1) }),
+      outboxRow({ rowKey: "row-b", createdAt: new Date(2) }),
+      outboxRow({ rowKey: "row-c", createdAt: new Date(3) }),
+    ];
+    const result = await buildPushOperations(rows, async () => doc);
+
+    expect(result.operations).toHaveLength(1);
+    expect(result.operations[0].rowKey).toBe("row-a");
+    // Every marker is covered, so one confirmation marks them all synced.
+    expect(result.operations[0].rowKeys).toEqual(["row-a", "row-b", "row-c"]);
+    expect(result.operations[0].operation).toBe("upsert");
+    expect(result.operations[0].doc).not.toHaveProperty("__v");
+  });
+
+  it("derives a delete when the document no longer exists", async () => {
+    const result = await buildPushOperations([outboxRow()], async () => null);
+    expect(result.operations[0].operation).toBe("delete");
+    expect(result.operations[0].doc).toBeNull();
+  });
+
+  it("strips session fields before a user document ever leaves the shop", async () => {
+    const row = outboxRow({
+      collectionName: "users",
+      entityType: "User",
+      docId: "64b7f9c2e1a2b3c4d5e6f7b9",
     });
-    let open = await listConflicts();
-    expect(open).toHaveLength(1);
-    await resolveConflict("c1");
-    open = await listConflicts();
-    expect(open).toHaveLength(0);
-    expect(await listConflicts(true)).toHaveLength(1);
+    const result = await buildPushOperations([row], async () => ({
+      _id: "64b7f9c2e1a2b3c4d5e6f7b9",
+      name: "Cashier",
+      refreshTokenHash: "secret",
+    }));
+    expect(result.operations[0].doc).not.toHaveProperty("refreshTokenHash");
+    expect(result.operations[0].doc?.name).toBe("Cashier");
+  });
+
+  it("keeps the acting user so the center can re-authorize the change", async () => {
+    const row = outboxRow({ actorUserId: "64b7f9c2e1a2b3c4d5e6f7aa" });
+    const result = await buildPushOperations([row], async () => doc);
+    expect(result.operations[0].actorUserId).toBe("64b7f9c2e1a2b3c4d5e6f7aa");
+  });
+
+  it("reports unsupported collections instead of pushing them", async () => {
+    const row = outboxRow({ collectionName: "syncoutboxes", entityType: "SyncOutbox" });
+    const result = await buildPushOperations([row], async () => doc);
+    expect(result.operations).toHaveLength(0);
+    expect(result.unsupported).toHaveLength(1);
+    expect(result.unsupported[0].collection).toBe("syncoutboxes");
   });
 });
 
-describe("catalog + customer cache", () => {
-  const cola = {
-    _id: "p1",
-    name: "Cola 500ml",
-    sku: "SKU-1",
-    barcode: "8901234500011",
-    sellingPrice: 50,
-    discountPrice: 0,
-    taxRate: 0,
-    currentStock: 12,
+describe("connection indicator state", () => {
+  const base: SyncStatus = {
+    role: "shop",
+    enabled: true,
+    configured: true,
+    missing: [],
+    nodeId: "shop-1",
+    nodeName: "Shop",
+    onlineUrl: "https://center.example.com",
+    pushEnabled: true,
+    pullEnabled: true,
+    workerRunning: false,
+    transport: "http",
+    databaseMode: "local",
+    localDatabaseConfigured: true,
+    localDb: {
+      dbName: "pos",
+      topology: "rs0",
+      transactionsSupported: true,
+      standalone: false,
+      checkedAt: "2026-10-01T10:00:00.000Z",
+    },
+    schemaVersion: LOCAL_SCHEMA_VERSION,
+    schemaTargetVersion: LOCAL_SCHEMA_VERSION,
+    counts: { pending: 0, sending: 0, failed: 0, synced: 0, conflicts: 0 },
+    connectivity: {
+      reachable: true,
+      lastAttemptAt: null,
+      lastSuccessAt: null,
+      lastError: null,
+      pullLastError: null,
+    },
+    trackingError: null,
+    migrationError: null,
+    runs: [],
   };
 
-  it("cacheCatalog replaces, upsertCachedProducts merges", async () => {
-    await cacheCatalog([cola], [{ _id: "c1", name: "Drinks" }]);
-    await upsertCachedProducts([{ ...cola, _id: "p2", name: "Chips" }]);
-    const products = await getCachedProducts();
-    expect(products).toHaveLength(2);
-    expect(await getCachedCategories()).toHaveLength(1);
-
-    await cacheCatalog([cola], [{ _id: "c1", name: "Drinks" }]); // full refresh replaces
-    expect(await getCachedProducts()).toHaveLength(1);
+  it("reports unconfigured instead of a false 'offline'", () => {
+    expect(describeSyncState(null)).toBe("UNCONFIGURED");
+    expect(describeSyncState({ ...base, pushEnabled: false, pullEnabled: false })).toBe("UNCONFIGURED");
   });
 
-  it("finds products offline by exact barcode and case-insensitive SKU", async () => {
-    await cacheCatalog([cola], []);
-    const byBarcode = await findCachedProductByBarcode("8901234500011");
-    expect(byBarcode?.name).toBe("Cola 500ml");
-    const bySku = await findCachedProductByBarcode("sku-1");
-    expect(bySku?._id).toBe("p1");
-    expect(await findCachedProductByBarcode("nope")).toBeNull();
+  it("treats an unreachable center as offline, with the shop still working", () => {
+    expect(
+      describeSyncState({
+        ...base,
+        counts: { pending: 4, sending: 0, failed: 0, synced: 0, conflicts: 0 },
+        connectivity: { ...base.connectivity, reachable: false },
+      })
+    ).toBe("OFFLINE");
   });
 
-  it("caches customers and keeps meta kv", async () => {
-    await upsertCachedCustomers([{ _id: "cu1", name: "Ahmad", phone: "070", balance: 0 }]);
-    expect(await getCachedCustomers()).toHaveLength(1);
-    await setMeta("lastSyncAt", 123);
-    expect(await getMeta<number>("lastSyncAt")).toBe(123);
-    expect(await getMeta<string>("missing")).toBeNull();
+  it("shows syncing while a run is active and complete once the queue drains", () => {
+    expect(describeSyncState({ ...base, workerRunning: true })).toBe("SYNCING");
+    expect(
+      describeSyncState({
+        ...base,
+        counts: { pending: 0, sending: 0, failed: 0, synced: 12, conflicts: 0 },
+      })
+    ).toBe("SYNC_COMPLETE");
+    expect(describeSyncState(base)).toBe("ONLINE");
   });
 });
 
-/* ---------------------------- sync engine --------------------------- */
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-describe("sync engine", () => {
-  it("pushes queued sales with the idempotency key and marks them synced", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(
-        { success: true, data: { invoiceNumber: "INV-100" } },
-        201
-      )
-    );
-
-    const result = await syncNow({ force: true });
-    expect(result.synced).toBe(1);
-    expect(result.remaining).toBe(0);
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
-    expect(body.clientTransactionId).toBe(sale.clientTransactionId);
-    expect(body.items).toEqual(sale.payload.items);
-
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("SYNCED");
-    expect(entry?.syncedInvoiceNumber).toBe("INV-100");
+describe("local database migrations", () => {
+  it("declares one migration per schema version, in order", () => {
+    const versions = LOCAL_MIGRATIONS.map((m) => m.version);
+    expect(versions).toEqual([...versions].sort((a, b) => a - b));
+    expect(new Set(versions).size).toBe(versions.length);
+    expect(Math.max(...versions)).toBe(LOCAL_SCHEMA_VERSION);
   });
 
-  it("treats an already-synced replay as success (no double sale)", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-
-    // Server says: this transaction id was already processed.
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ success: true, alreadySynced: true, data: { invoiceNumber: "INV-77" } }, 200)
-    );
-
-    const result = await syncNow({ force: true });
-    expect(result.synced).toBe(1);
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("SYNCED");
-    expect(entry?.syncedInvoiceNumber).toBe("INV-77");
-  });
-
-  it("schedules a 30s backoff when the network fails mid-sync", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
-
-    const before = Date.now();
-    const result = await syncNow({ force: true });
-    expect(result.synced).toBe(0);
-    expect(result.remaining).toBe(1);
-
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("PENDING");
-    expect(entry?.attempts).toBe(1);
-    expect(entry?.nextAttemptAt).toBeGreaterThanOrEqual(before + 30_000);
-    expect(entry?.nextAttemptAt).toBeLessThan(before + 65_000);
-  });
-
-  it("does not auto-retry entries still inside their backoff window", async () => {
-    await enqueueSale(queuedSale({ nextAttemptAt: Date.now() + 10 * 60_000, attempts: 4 }));
-    const result = await syncNow(); // no force
-    expect(result.synced).toBe(0);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.remaining).toBe(1);
-  });
-
-  it("force (Sync now) bypasses the backoff window", async () => {
-    const sale = queuedSale({ nextAttemptAt: Date.now() + 10 * 60_000, attempts: 4 });
-    await enqueueSale(sale);
-    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true, data: { invoiceNumber: "INV-9" } }, 201));
-
-    const result = await syncNow({ force: true });
-    expect(result.synced).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("marks stock conflicts as FAILED and records a conflict (never overwrites)", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(
-        { success: false, error: { code: "INSUFFICIENT_STOCK", message: "Insufficient stock for Cola", conflict: true } },
-        409
-      )
-    );
-
-    const result = await syncNow({ force: true });
-    expect(result.failed).toBe(1);
-    expect(result.synced).toBe(0);
-
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("FAILED");
-    expect(entry?.lastError).toContain("INSUFFICIENT_STOCK");
-
-    const conflicts = await listConflicts();
-    expect(conflicts).toHaveLength(1);
-    expect(conflicts[0].kind).toBe("STOCK_CONFLICT");
-    // No further automatic attempts for permanent failures.
-    expect(entry!.nextAttemptAt).toBeGreaterThan(Date.now() + 3_600_000);
-  });
-
-  it("marks permanent 400 validation errors as FAILED", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ success: false, error: { code: "INVALID_PAYMENT", message: "Payments exceed total" } }, 400)
-    );
-    const result = await syncNow({ force: true });
-    expect(result.failed).toBe(1);
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("FAILED");
-    expect(entry?.lastError).toContain("INVALID_PAYMENT");
-  });
-
-  it("retries transient 5xx errors with backoff instead of failing", async () => {
-    const sale = queuedSale();
-    await enqueueSale(sale);
-    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "Internal error" }, 500));
-
-    const result = await syncNow({ force: true });
-    expect(result.failed).toBe(0);
-    expect(result.synced).toBe(0);
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    expect(entry?.status).toBe("PENDING");
-    expect(entry?.attempts).toBe(1);
-    expect(entry?.nextAttemptAt).toBeGreaterThan(Date.now());
-  });
-
-  it("retryEntry requeues a FAILED sale for immediate sync", async () => {
-    const sale = queuedSale({ status: "FAILED", nextAttemptAt: Number.MAX_SAFE_INTEGER, attempts: 3 });
-    await enqueueSale(sale);
-    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true, data: { invoiceNumber: "INV-2" } }, 201));
-
-    const entry = await getQueuedSale(sale.clientTransactionId);
-    await retryEntry(sale.clientTransactionId, entry!);
-    const result = await syncNow({ force: true });
-    expect(result.synced).toBe(1);
-  });
-
-  it("does nothing while the device is offline", async () => {
-    await enqueueSale(queuedSale());
-    setConnectionStatus("OFFLINE");
-    const result = await syncNow({ force: true });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.remaining).toBe(1);
-    setConnectionStatus("ONLINE");
-  });
-
-  it("processes the queue strictly in creation order (oldest first)", async () => {
-    const first = queuedSale({ createdAt: 1000, offlineRef: "OFFLINE-00000000-000001" });
-    const second = queuedSale({ createdAt: 2000, offlineRef: "OFFLINE-00000000-000002" });
-    await enqueueSale(first);
-    await enqueueSale(second);
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { invoiceNumber: "A" } }, 201))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { invoiceNumber: "B" } }, 201));
-
-    await syncNow({ force: true });
-    const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
-    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
-    expect(firstBody.clientTransactionId).toBe(first.clientTransactionId);
-    expect(secondBody.clientTransactionId).toBe(second.clientTransactionId);
-    expect((await getQueuedSale(first.clientTransactionId))?.syncedInvoiceNumber).toBe("A");
-    expect((await getQueuedSale(second.clientTransactionId))?.syncedInvoiceNumber).toBe("B");
+  it("describes every migration", () => {
+    for (const migration of LOCAL_MIGRATIONS) {
+      expect(migration.name.length).toBeGreaterThan(2);
+      expect(typeof migration.up).toBe("function");
+    }
   });
 });

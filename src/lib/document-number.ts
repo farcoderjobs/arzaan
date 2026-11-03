@@ -40,6 +40,24 @@ export async function generateDocumentNumber(
   return `${prefix}-${Date.now().toString().slice(-6)}`;
 }
 
+/**
+ * Purchase number: `PUR-YYYY-MM-XXXXXX`.
+ *
+ * Deliberately NOT a per-database sequence: purchases are created offline on
+ * each shop's own local MongoDB and only meet at the center, so two shops would
+ * both produce `…-000001` and collide on the unique index. The suffix is 6
+ * base36 characters (~2.2 billion values a month), which makes a collision
+ * between registers, shops or retries negligible while keeping the number
+ * readable and still matching the `PUR-` prefix used by labels and batches.
+ */
+export function generatePurchaseNumber(now = new Date()): string {
+  const suffix = Math.floor(Math.random() * 36 ** 6)
+    .toString(36)
+    .toUpperCase()
+    .padStart(6, "0");
+  return `PUR-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${suffix}`;
+}
+
 export async function generateReturnNumber(): Promise<string> {
   const now = new Date();
   const prefix = `RET-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;

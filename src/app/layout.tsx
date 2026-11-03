@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, Vazirmatn } from "next/font/google";
 import "./globals.css";
 import { ToastContainer } from "@/components/ui/toast";
 import { getLocale } from "@/i18n/server";
@@ -8,8 +7,10 @@ import { I18nProvider } from "@/i18n/client";
 import { LOCALE_META } from "@/i18n/config";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const vazir = Vazirmatn({ subsets: ["arabic"], variable: "--font-vazir" });
+// Fonts are resolved from the local system stack (see globals.css). The app
+// must boot, build and serve with no internet: `next/font/google` downloads
+// from fonts.googleapis.com at build/dev time, which left every page blank on
+// an offline shop PC.
 
 export const metadata: Metadata = {
   title: "POS Dashboard",
@@ -26,7 +27,7 @@ export default async function RootLayout({
   const meta = LOCALE_META[locale];
 
   return (
-    <html lang={locale} dir={meta.dir} className={`${inter.variable} ${vazir.variable}`}>
+    <html lang={locale} dir={meta.dir}>
       <body className="font-sans antialiased">
         <I18nProvider locale={locale} dict={dict}>
           {children}

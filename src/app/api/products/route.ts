@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import { Product, Category, Brand } from "@/models";
+import { Product, Category, Brand, Department } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -8,12 +8,28 @@ import { z } from "zod";
 import { success, badRequest, forbidden, notFound } from "@/lib/api";
 import mongoose from "mongoose";
 
+const barcodeEntrySchema = z.object({
+  code: z.string().trim().min(1, "Barcode is required"),
+  label: z.string().trim().max(80).default(""),
+});
+
 const createSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   sku: z.string().min(1, "SKU is required"),
   barcode: z.string().optional(),
+  /** Extra barcodes (flavours / packaging variants of the same sellable product). */
+  barcodes: z.array(barcodeEntrySchema).max(50).optional(),
+  /** Optional product-level expiry (batches received by purchase override it). */
+  expirationDate: z.string().trim().nullable().optional(),
+  /** Variants are linked product rows with their own price and stock. */
+  parentProductId: z.string().trim().nullable().optional(),
+  variantName: z.string().trim().max(120).default(""),
   categoryId: z.string().optional().nullable(),
   brandId: z.string().optional().nullable(),
+  /** Department that owns the product (sales are reported there). */
+  departmentId: z.string().optional().nullable(),
+  /** Import (China) vs Local origin, used when a sold batch has no source. */
+  purchaseSource: z.enum(["import", "local"]).nullish(),
   purchasePrice: z.number().min(0, "Purchase price cannot be negative").default(0),
   sellingPrice: z.number().min(0, "Selling price cannot be negative").default(0),
   wholesalePrice: z.number().min(0, "Wholesale price cannot be negative").default(0),
@@ -34,6 +50,46 @@ const saveSchema = createSchema.extend({
  * a bare 500. Catches races the pre-insert uniqueness checks cannot (e.g. two
  * submits of the same SKU/barcode at once).
  */
+/** Normalizes + de-duplicates the extra barcode list. */
+function normalizeBarcodes(entries: Array<{ code: string; label: string }> | undefined) {
+  const seen = new Set<string>();
+  const result: Array<{ code: string; label: string }> = [];
+  for (const entry of entries ?? []) {
+    const code = entry.code.trim().toUpperCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    result.push({ code, label: entry.label.trim() });
+  }
+  return result;
+}
+
+/**
+ * One barcode may identify only one product/variant. Checks both the primary
+ * `barcode` field and every entry of the `barcodes` array of other products.
+ */
+async function findBarcodeConflict(code: string, excludeId?: string) {
+  const normalized = code.trim();
+  if (!normalized) return null;
+  // Case-insensitive so legacy lower-case barcodes cannot be duplicated.
+  const exact = new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+  const query: Record<string, unknown> = {
+    $or: [{ barcode: exact }, { "barcodes.code": exact }],
+  };
+  if (excludeId) query._id = { $ne: excludeId };
+  return Product.findOne(query).select("name sku barcode").lean();
+}
+
+/**
+ * Parses an optional date string. Absent/empty input → null (no date).
+ * Returns undefined ONLY for an unparseable value so the caller can reject it.
+ */
+function parseOptionalDate(value: string | null | undefined): Date | null | undefined {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
 function duplicateKeyResponse(error: unknown): NextResponse | null {
   const e = error as { name?: string; message?: string } | null | undefined;
   if (!e || !/E11000/.test(e.message ?? "")) return null;
@@ -58,11 +114,13 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status")?.trim() ?? "";
     const categoryId = searchParams.get("categoryId")?.trim() ?? "";
     const brandId = searchParams.get("brandId")?.trim() ?? "";
+    const departmentId = searchParams.get("departmentId")?.trim() ?? "";
 
     const query: Record<string, unknown> = {};
     if (status) query.status = status;
     if (categoryId) query.categoryId = categoryId;
     if (brandId) query.brandId = brandId;
+    if (departmentId) query.departmentId = departmentId;
 
     let textQuery: Record<string, unknown> = {};
     if (search) {
@@ -71,6 +129,7 @@ export async function GET(req: NextRequest) {
           { name: { $regex: search, $options: "i" } },
           { sku: { $regex: search, $options: "i" } },
           { barcode: { $regex: search, $options: "i" } },
+          { "barcodes.code": { $regex: search, $options: "i" } },
         ],
       };
     }
@@ -88,6 +147,7 @@ export async function GET(req: NextRequest) {
     const total = await Product.countDocuments(filter);      const products = await Product.find(filter)
       .populate<{ categoryId: { name: string } }>("categoryId", "name")
       .populate<{ brandId: { name: string } }>("brandId", "name")
+      .populate<{ departmentId: { name: string } }>("departmentId", "name")
       .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
@@ -98,6 +158,8 @@ export async function GET(req: NextRequest) {
         ...p,
         categoryId: p.categoryId as { _id: string; name: string } | null,
         brandId: p.brandId as { _id: string; name: string } | null,
+        departmentId: p.departmentId as { _id: string; name: string } | null,
+        departmentName: (p.departmentId as { name?: string } | null)?.name ?? "",
       })),
       total,
       page,
@@ -132,17 +194,42 @@ export async function POST(req: NextRequest) {
     const isUpdate = Boolean(data.id);
     const now = new Date();
 
+    const expirationDate = parseOptionalDate(data.expirationDate);
+    if (expirationDate === undefined) {
+      return NextResponse.json(badRequest("Validation failed", { expirationDate: "Invalid date" }), { status: 400 });
+    }
+    const barcodes = normalizeBarcodes(data.barcodes);
+
     if (!isUpdate) {
       // Create
       if (data.barcode) {
-        const exists = await Product.findOne({ barcode: data.barcode });
-        if (exists) {
-          return NextResponse.json(badRequest("A product with this barcode already exists"), { status: 400 });
+        const conflict = await findBarcodeConflict(data.barcode);
+        if (conflict) {
+          return NextResponse.json(
+            badRequest(`This barcode already exists — it is assigned to ${conflict.name}`),
+            { status: 400 }
+          );
+        }
+      }
+      for (const entry of barcodes) {
+        const conflict = await findBarcodeConflict(entry.code);
+        if (conflict) {
+          return NextResponse.json(
+            badRequest(`This barcode already exists — ${entry.code} is assigned to ${conflict.name}`),
+            { status: 400 }
+          );
         }
       }
       const skuExists = await Product.findOne({ sku: data.sku });
       if (skuExists) {
         return NextResponse.json(badRequest("A product with this SKU already exists"), { status: 400 });
+      }
+
+      if (data.parentProductId) {
+        const parent = await Product.findById(data.parentProductId);
+        if (!parent) {
+          return NextResponse.json(badRequest("Parent product not found"), { status: 400 });
+        }
       }
 
       if (data.categoryId) {
@@ -157,6 +244,12 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(badRequest("Brand not found"), { status: 400 });
         }
       }
+      if (data.departmentId) {
+        const department = await Department.findById(data.departmentId);
+        if (!department) {
+          return NextResponse.json(badRequest("Department not found"), { status: 400 });
+        }
+      }
 
       const product = await Product.create({
         name: data.name.trim(),
@@ -166,8 +259,14 @@ export async function POST(req: NextRequest) {
         // barcode would collide with E11000 (surfaced as a 500). Leaving the
         // path undefined omits the field and the sparse index skips it.
         barcode: data.barcode?.trim().toUpperCase() || undefined,
+        barcodes,
+        expirationDate: expirationDate ?? null,
+        parentProductId: (data.parentProductId || null) as unknown as mongoose.Types.ObjectId | null,
+        variantName: data.variantName,
         categoryId: data.categoryId as unknown as mongoose.Types.ObjectId,
         brandId: (data.brandId || null) as unknown as mongoose.Types.ObjectId | null,
+        departmentId: (data.departmentId || null) as unknown as mongoose.Types.ObjectId | null,
+        purchaseSource: data.purchaseSource ?? null,
         costPrice: data.purchasePrice,
         sellingPrice: data.sellingPrice,
         discountPrice: data.wholesalePrice,
@@ -198,6 +297,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(badRequest("Brand not found"), { status: 400 });
       }
     }
+    if (data.departmentId) {
+      const department = await Department.findById(data.departmentId);
+      if (!department) {
+        return NextResponse.json(badRequest("Department not found"), { status: 400 });
+      }
+    }
 
     // SKU uniqueness
     if (data.sku && data.sku !== product.sku) {
@@ -206,10 +311,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(badRequest("Another product with this SKU already exists"), { status: 400 });
       }
     }
-    if (data.barcode && data.barcode !== product.barcode) {
-      const exists = await Product.findOne({ barcode: data.barcode, _id: { $ne: product._id } });
-      if (exists) {
-        return NextResponse.json(badRequest("Another product with this barcode already exists"), { status: 400 });
+    const normalizedBarcode = data.barcode?.trim().toUpperCase() ?? "";
+    if (normalizedBarcode && normalizedBarcode !== ((product.barcode ?? "").toUpperCase())) {
+      const conflict = await findBarcodeConflict(normalizedBarcode, product._id.toString());
+      if (conflict) {
+        return NextResponse.json(
+          badRequest(`This barcode already exists — it is assigned to ${conflict.name}`),
+          { status: 400 }
+        );
+      }
+    }
+    for (const entry of barcodes) {
+      if (entry.code === normalizedBarcode) continue;
+      const conflict = await findBarcodeConflict(entry.code, product._id.toString());
+      if (conflict) {
+        return NextResponse.json(
+          badRequest(`This barcode already exists — ${entry.code} is assigned to ${conflict.name}`),
+          { status: 400 }
+        );
+      }
+    }
+    if (data.parentProductId) {
+      if (data.parentProductId === product._id.toString()) {
+        return NextResponse.json(badRequest("A product cannot be its own variant parent"), { status: 400 });
+      }
+      const parent = await Product.findById(data.parentProductId);
+      if (!parent) {
+        return NextResponse.json(badRequest("Parent product not found"), { status: 400 });
       }
     }
 
@@ -218,8 +346,16 @@ export async function POST(req: NextRequest) {
     // Same sparse-index rule as create: clearing the barcode unsets the field
     // instead of storing "" (which would collide with other barcode-less rows).
     product.set("barcode", data.barcode?.trim().toUpperCase() || undefined);
+    // Only touch the barcode list when the caller actually sent one — editing
+    // name/price from the product form must not wipe extra barcodes.
+    if (data.barcodes !== undefined) product.barcodes = barcodes;
+    product.expirationDate = expirationDate ?? null;
+    product.parentProductId = (data.parentProductId || null) as unknown as mongoose.Types.ObjectId | null;
+    product.variantName = data.variantName;
     product.categoryId = data.categoryId as unknown as mongoose.Types.ObjectId;
     product.brandId = (data.brandId || null) as unknown as mongoose.Types.ObjectId | null;
+    product.departmentId = (data.departmentId || null) as unknown as mongoose.Types.ObjectId | null;
+    if (data.purchaseSource !== undefined) product.purchaseSource = data.purchaseSource ?? null;
     product.costPrice = data.purchasePrice;
     product.sellingPrice = data.sellingPrice;
     product.discountPrice = data.wholesalePrice;
@@ -233,7 +369,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(success({ product }, "Product updated"));
   } catch (error) {
-    return duplicateKeyResponse(error) ?? NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const duplicate = duplicateKeyResponse(error);
+    if (duplicate) return duplicate;
+    console.error("POST /api/products error:", error);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 

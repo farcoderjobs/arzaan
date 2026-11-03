@@ -80,7 +80,9 @@ export function Header({ user }: HeaderProps) {
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    // Drop cached page shells, then sign out (offline queue is kept).
+                    // Drop cached page shells, then sign out. Nothing financial lives
+                    // in the browser: sales and the pending queue are already in the
+                    // shop's local database and keep syncing after sign-out.
                     void clearAppShellCache().finally(() => logoutAction());
                   }}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100"

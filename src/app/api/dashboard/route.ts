@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { forbidden } from "@/lib/api";
 import { round2 } from "@/lib/commerce";
 import { approvedReturnsTotals, approvedReturnsByDay, approvedReturnsByProduct } from "@/lib/report-returns";
+import { getExpiryAlerts, type ExpiryAlerts } from "@/lib/expiry-alerts";
 
 /**
  * GET /api/dashboard?days=N (default 1 = today; up to 30 for charts)
@@ -48,6 +49,25 @@ export async function GET(req: NextRequest) {
     // ---------- Sales KPIs (today + selected chart range) ----------
     // The dashboard range selector must affect the KPI cards, not just the
     // charts, so both windows are aggregated with the same pipeline.
+    // Tender totals come from the stored payment lines, never from the sale
+    // total: change handed back reduces cash, and an employee's on-account
+    // remainder is not money collected. This keeps the dashboard KPIs, the
+    // sales report payment split and the drawer movements on one definition.
+    const tenderSum = (methods: string[]) => ({
+      $cond: [
+        { $gt: [{ $size: { $ifNull: ["$payments", []] } }, 0] },
+        {
+          $sum: {
+            $map: {
+              input: "$payments",
+              as: "p",
+              in: { $cond: [{ $in: ["$$p.method", methods] }, "$$p.amount", 0] },
+            },
+          },
+        },
+        { $cond: [{ $in: ["$paymentMethod", methods] }, "$total", 0] },
+      ],
+    });
     const salesKpiPipeline = (match: Record<string, unknown>): mongoose.PipelineStage[] => [
       { $match: match },
       {
@@ -56,10 +76,9 @@ export async function GET(req: NextRequest) {
           revenue: { $sum: "$total" },
           netRevenue: { $sum: { $subtract: ["$subtotal", "$discount"] } },
           count: { $sum: 1 },
-          cash: { $sum: { $cond: [{ $eq: ["$paymentMethod", "cash"] }, "$total", 0] } },
-          card: { $sum: { $cond: [{ $in: ["$paymentMethod", ["card", "transfer"]] }, "$total", 0] } },
-          credit: { $sum: { $cond: [{ $eq: ["$paymentMethod", "credit"] }, "$total", 0] } },
-          mixedCash: { $sum: { $cond: [{ $eq: ["$paymentMethod", "mixed"] }, { $sum: { $map: { input: "$payments", as: "p", in: { $cond: [{ $eq: ["$$p.method", "cash"] }, "$$p.amount", 0] } } } }, 0] } },
+          cash: { $sum: { $subtract: [tenderSum(["cash"]), { $ifNull: ["$changeAmount", 0] }] } },
+          card: { $sum: tenderSum(["card", "transfer"]) },
+          credit: { $sum: tenderSum(["credit"]) },
         },
       },
     ] as mongoose.PipelineStage[];
@@ -169,7 +188,7 @@ export async function GET(req: NextRequest) {
                   as: "mv",
                   in: {
                     $cond: [
-                      { $in: ["$$mv.movementType", ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN"]] },
+                      { $in: ["$$mv.movementType", ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN", "TRANSFER_IN"]] },
                       "$$mv.quantity",
                       { $multiply: ["$$mv.quantity", -1] },
                     ],
@@ -196,6 +215,12 @@ export async function GET(req: NextRequest) {
         stock: p.stock,
         reorderPoint: p.reorderPoint,
       }));
+    }
+
+    // ---------- Expiration alerts (expired separated from expiring soon) ----------
+    let expiry: ExpiryAlerts | null = null;
+    if (canInventory) {
+      expiry = await getExpiryAlerts(user.branchId ?? null);
     }
 
     // ---------- Top products (range, net of approved returns) ----------
@@ -256,9 +281,9 @@ export async function GET(req: NextRequest) {
           revenue: { $sum: "$total" },
           netRevenue: { $sum: { $subtract: ["$subtotal", "$discount"] } },
           count: { $sum: 1 },
-          cash: { $sum: { $cond: [{ $eq: ["$paymentMethod", "cash"] }, "$total", 0] } },
-          card: { $sum: { $cond: [{ $in: ["$paymentMethod", ["card", "transfer"]] }, "$total", 0] } },
-          credit: { $sum: { $cond: [{ $eq: ["$paymentMethod", "credit"] }, "$total", 0] } },
+          cash: { $sum: { $subtract: [tenderSum(["cash"]), { $ifNull: ["$changeAmount", 0] }] } },
+          card: { $sum: tenderSum(["card", "transfer"]) },
+          credit: { $sum: tenderSum(["credit"]) },
         },
       },
       { $sort: { _id: 1 } },
@@ -375,6 +400,7 @@ export async function GET(req: NextRequest) {
       receivables: canFinance || canSales ? receivables : null,
       payables: canFinance || canPurchases ? payables : null,
       stock: canInventory ? { lowStockCount, outOfStock, lowStock } : null,
+      expiry,
       topProducts,
       recentSales,
       categorySplit,

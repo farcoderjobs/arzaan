@@ -13,13 +13,16 @@ export type PricingItemInput = {
   unitDiscount: number;
 };
 
+export type SalePricingMode = "retail" | "wholesale";
+
 export type ServerProduct = {
   _id: string;
   name: string;
   sku: string;
   costPrice: number;
   sellingPrice: number;
-  discountPrice: number;
+  /** Stored wholesale price (`discountPrice` in the database). */
+  wholesalePrice: number;
   taxRate: number;
   currentStock: number;
 };
@@ -34,7 +37,18 @@ export type PricingItemResult = {
   discount: number;
   tax: number;
   subtotal: number;
+  pricingMode: SalePricingMode;
 };
+
+/** Thrown when wholesale mode is requested for a product with no wholesale price. */
+export class WholesalePriceUnavailableError extends Error {
+  productName: string;
+  constructor(productName: string) {
+    super(`${productName} has no wholesale price configured`);
+    this.name = "WholesalePriceUnavailableError";
+    this.productName = productName;
+  }
+}
 
 export type PricingResult = {
   items: PricingItemResult[];
@@ -72,15 +86,18 @@ export function validateSaleDiscount(discount: number, discountType: "amount" | 
  * Recomputes the whole sale from server-verified products.
  * Never trusts client totals — only productId/quantity/discount inputs.
  *
- * Effective unit price = discountPrice when set and cheaper (product-level promo),
- * else sellingPrice. Line discount applies on top (amount off the line, or % of the line).
+ * Pricing mode is explicit: `retail` always uses sellingPrice and `wholesale`
+ * always uses the stored wholesale price. A product without a positive
+ * wholesale price is rejected rather than silently priced at zero.
+ * Line discount applies on top (amount off the line, or % of the line).
  * Tax is per item at the product's taxRate on the discounted line.
  */
 export function computeSaleTotals(
   items: PricingItemInput[],
   products: ServerProduct[],
   saleDiscount: number,
-  discountType: "amount" | "percent"
+  discountType: "amount" | "percent",
+  pricingMode: SalePricingMode = "retail"
 ): PricingResult {
   const productMap = new Map(products.map((p) => [p._id.toString(), p]));
   const itemResults: PricingItemResult[] = [];
@@ -92,9 +109,12 @@ export function computeSaleTotals(
     const product = productMap.get(item.productId);
     if (!product) throw new Error(`Product ${item.productId} not found`);
 
-    const basePrice = product.discountPrice > 0 && product.discountPrice < product.sellingPrice
-      ? product.discountPrice
-      : product.sellingPrice;
+    const basePrice =
+      pricingMode === "wholesale"
+        ? product.wholesalePrice > 0
+          ? product.wholesalePrice
+          : (() => { throw new WholesalePriceUnavailableError(product.name); })()
+        : product.sellingPrice;
 
     const gross = round2(basePrice * item.quantity);
     const lineDiscount =
@@ -118,6 +138,7 @@ export function computeSaleTotals(
       discount: round2(lineDiscount),
       tax: lineTax,
       subtotal: round2(net + lineTax),
+      pricingMode,
     });
   }
 
@@ -141,8 +162,77 @@ export function computeSaleTotals(
   };
 }
 
-export const PAYMENT_METHODS = ["cash", "card", "transfer", "credit"] as const;
+/**
+ * Direct-sale items: goods bought in the market and sold without ever entering
+ * stock. They are priced server-side from the validated input — never from
+ * client-calculated totals — and never create inventory movements.
+ */
+export type DirectItemInput = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number;
+  taxRate: number;
+};
+
+export type DirectItemResult = {
+  productId: null;
+  itemType: "direct";
+  name: string;
+  sku: string;
+  quantity: number;
+  sellingPrice: number;
+  costPrice: number;
+  discount: number;
+  tax: number;
+  subtotal: number;
+  /** Direct-sale lines are negotiated at the counter, never a catalog tier. */
+  pricingMode: "retail";
+};
+
+export function computeDirectItemTotals(items: DirectItemInput[]): {
+  items: DirectItemResult[];
+  subtotal: number;
+  tax: number;
+} {
+  let subtotal = 0;
+  let tax = 0;
+  const results: DirectItemResult[] = [];
+
+  for (const item of items) {
+    const quantity = Math.max(0, Math.floor(item.quantity));
+    const unitPrice = round2(Math.max(0, item.unitPrice));
+    const unitCost = round2(Math.max(0, item.unitCost));
+    const taxRate = Math.min(100, Math.max(0, item.taxRate));
+    const gross = round2(unitPrice * quantity);
+    const lineTax = round2((gross * taxRate) / 100);
+
+    subtotal = round2(subtotal + gross);
+    tax = round2(tax + lineTax);
+
+    results.push({
+      productId: null,
+      itemType: "direct",
+      name: item.description.trim().slice(0, 200),
+      sku: "DIRECT",
+      quantity,
+      sellingPrice: unitPrice,
+      costPrice: unitCost,
+      discount: 0,
+      tax: lineTax,
+      subtotal: round2(gross + lineTax),
+      pricingMode: "retail",
+    });
+  }
+
+  return { items: results, subtotal, tax };
+}
+
+export const PAYMENT_METHODS = ["cash", "card", "transfer", "credit", "bonus", "exchange"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/** Methods a client may submit directly. `exchange` is issued only by the server. */
+export const CLIENT_PAYMENT_METHODS = ["cash", "card", "transfer", "credit", "bonus"] as const;
 
 export type PaymentInput = {
   method: PaymentMethod;
@@ -168,7 +258,7 @@ export function validatePayments(
 
   let nonCash = 0;
   let cash = 0;
-  let totalPaid = 0;
+  let credit = 0;
 
   for (const p of payments) {
     if (!PAYMENT_METHODS.includes(p.method)) {
@@ -179,19 +269,38 @@ export function validatePayments(
     }
     if (p.method === "cash") {
       cash = round2(cash + p.amount);
+    } else if (p.method === "credit") {
+      credit = round2(credit + p.amount);
     } else {
+      // card, transfer, bonus credit and exchange credit can never overpay.
       nonCash = round2(nonCash + p.amount);
     }
   }
 
-  totalPaid = round2(cash + nonCash);
+  const totalPaid = round2(cash + nonCash + credit);
 
   // Non-cash cannot overpay — only cash can produce change.
   if (nonCash > total + 0.001) {
     return { ok: false, error: "Non-cash payments exceed the total. Only cash can produce change." };
   }
 
-  if (totalPaid < total - 0.001 && !payments.some((p) => p.method === "credit")) {
+  if (credit > 0) {
+    // Credit covers the remainder and creates customer debt. Every tender must
+    // add up exactly to the total (cash overpay alongside credit is rejected).
+    const covered = round2(cash + nonCash);
+    if (covered > total + 0.001) {
+      return { ok: false, error: "Payments exceed the total alongside credit" };
+    }
+    if (round2(covered + credit) < total - 0.001) {
+      return { ok: false, error: "Total paid does not cover the sale total" };
+    }
+    if (round2(covered + credit) > total + 0.001) {
+      return { ok: false, error: "Payments exceed the sale total" };
+    }
+    return { ok: true, totalPaid };
+  }
+
+  if (totalPaid < total - 0.001) {
     return { ok: false, error: "Total paid does not cover the sale total" };
   }
 
@@ -209,7 +318,12 @@ export function validatePayments(
 export function computeSalePaymentFields(
   payments: PaymentInput[],
   total: number
-): { paymentLines: Array<{ method: PaymentMethod; amount: number; reference: string }>; paidAmount: number; changeAmount: number; paymentMethod: PaymentMethod | "mixed" } {
+): {
+  paymentLines: Array<{ method: PaymentMethod; amount: number; reference: string }>;
+  paidAmount: number;
+  changeAmount: number;
+  paymentMethod: PaymentMethod | "mixed" | null;
+} {
   let paid = 0;
   let cash = 0;
   let nonCash = 0;
@@ -217,6 +331,9 @@ export function computeSalePaymentFields(
 
   for (const p of payments) {
     const amount = round2(p.amount);
+    // Zero-amount tenders are not payments: an employee purchase paid entirely
+    // on account arrives with an empty (or all-zero) tender list.
+    if (amount <= 0) continue;
     paid = round2(paid + amount);
     if (p.method === "cash") cash = round2(cash + amount);
     else nonCash = round2(nonCash + amount);
@@ -226,11 +343,61 @@ export function computeSalePaymentFields(
   const changeAmount = cash > 0 ? round2(Math.max(0, cash - Math.max(0, total - nonCash))) : 0;
   // paidAmount counts only what actually settles the sale (excluding change given back)
   const effectivePaid = round2(Math.min(paid - changeAmount, total));
-  const method = paymentLines.length === 1 ? paymentLines[0].method : "mixed";
+  const method =
+    paymentLines.length === 0 ? null : paymentLines.length === 1 ? paymentLines[0].method : "mixed";
 
   return { paymentLines, paidAmount: effectivePaid, changeAmount, paymentMethod: method };
 }
 
 export function formatMoney(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ---------------------------------------------------------------------------
+// Customer reward credit (bonus)
+// ---------------------------------------------------------------------------
+
+/**
+ * Bonus is earned on merchandise value, never on tax or on the portion paid
+ * with bonus credit. `amount_paid` also includes tax (but still excludes the
+ * bonus-funded portion), which stores can opt into via settings.
+ */
+export type BonusEarnBasis = "net_merchandise" | "amount_paid";
+
+export function computeBonusEarnBase(input: {
+  subtotal: number;
+  discount: number;
+  total: number;
+  bonusRedeemed: number;
+  basis: BonusEarnBasis;
+}): number {
+  const merchandise = round2(input.subtotal - input.discount);
+  const base =
+    input.basis === "amount_paid"
+      ? round2(input.total - input.bonusRedeemed)
+      : round2(merchandise - input.bonusRedeemed);
+  return Math.max(0, base);
+}
+
+export function computeBonusEarned(base: number, percent: number): number {
+  const safePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  const safeBase = Math.max(0, Number.isFinite(base) ? base : 0);
+  return round2((safeBase * safePercent) / 100);
+}
+
+/**
+ * Proportional reversal for a return. Returns how much of the sale's earned
+ * bonus should be clawed back by this return, never exceeding the un-reversed
+ * remainder of the original earn.
+ */
+export function computeBonusReversal(input: {
+  earned: number;
+  refundAmount: number;
+  saleTotal: number;
+  alreadyReversed: number;
+}): number {
+  if (input.earned <= 0 || input.saleTotal <= 0 || input.refundAmount <= 0) return 0;
+  const proportional = round2((input.earned * input.refundAmount) / input.saleTotal);
+  const remaining = round2(Math.max(0, input.earned - input.alreadyReversed));
+  return round2(Math.max(0, Math.min(proportional, remaining)));
 }

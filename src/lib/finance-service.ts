@@ -37,7 +37,7 @@ export async function requireOpenRegister(userId: string, session?: mongoose.Cli
 export type CashMovementInput = {
   userId: string;
   branchId: string | null;
-  type: "sale" | "refund" | "expense" | "income" | "adjustment";
+  type: "sale" | "refund" | "expense" | "income" | "adjustment" | "purchase" | "payment_in" | "payment_out";
   amount: number;
   description: string;
   referenceType: "sale" | "sale_return" | "expense" | "customer_payment" | "supplier_payment" | "income" | "adjustment";

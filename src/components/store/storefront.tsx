@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/utils/classname";
 import { money, setCurrency } from "@/lib/currency";
 import { success, error as toastError } from "@/utils/toast";
+
+import type { StorefrontCategory } from "@/lib/store-categories";
 
 export type StoreProductView = {
   id: string;
@@ -15,6 +18,8 @@ export type StoreProductView = {
   accent: string;
   imageUrl: string;
   category: string;
+  /** Stable category key from the database (`category:<id>` / `name:<name>`). */
+  categoryKey: string;
   stock: number;
   inStock: boolean;
   featured: boolean;
@@ -52,22 +57,29 @@ function emojiFor(category: string, name: string): string {
 
 const CART_STORAGE_KEY = "store_cart_v1";
 
+const ALL_CATEGORIES = "all";
+
 export function Storefront({
   products,
   categories,
+  initialCategory = ALL_CATEGORIES,
   storeName,
   currency,
   storePhone,
+  loadError = false,
 }: {
   products: StoreProductView[];
-  categories: string[];
+  /** Active, published categories from the MongoDB category collection. */
+  categories: StorefrontCategory[];
+  initialCategory?: string;
   storeName: string;
   currency: string;
   storePhone: string;
+  loadError?: boolean;
 }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [query, setQuery] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [placing, setPlacing] = useState(false);
@@ -148,10 +160,15 @@ export function Storefront({
 
   const qtyOf = (productId: string) => cart.find((l) => l.productId === productId)?.quantity ?? 0;
 
+  const activeCategoryName =
+    activeCategory === ALL_CATEGORIES
+      ? null
+      : categories.find((c) => c.key === activeCategory)?.name ?? null;
+
   const visibleProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      const catOk = activeCategory === "All" || p.category === activeCategory;
+      const catOk = activeCategory === ALL_CATEGORIES || p.categoryKey === activeCategory;
       const qOk = !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
       return catOk && qOk;
     });
@@ -234,22 +251,41 @@ export function Storefront({
             </div>
           </div>
 
-          {/* Category chips */}
+          {/* Category chips — built from the database, linked by category slug */}
           {categories.length > 0 && (
             <div className="store-fade-up no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" style={{ animationDelay: "240ms" }}>
-              {["All", ...categories].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
+              <Link
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveCategory(ALL_CATEGORIES);
+                }}
+                className={cn(
+                  "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition duration-200 active:scale-95",
+                  activeCategory === ALL_CATEGORIES
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                )}
+              >
+                All
+              </Link>
+              {categories.map((cat) => (
+                <Link
+                  key={cat.key}
+                  href={`/?category=${encodeURIComponent(cat.slug)}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveCategory(cat.key);
+                  }}
                   className={cn(
                     "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition duration-200 active:scale-95",
-                    activeCategory === cat
+                    activeCategory === cat.key
                       ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
                       : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
                   )}
                 >
-                  {cat}
-                </button>
+                  {cat.name}
+                </Link>
               ))}
             </div>
           )}
@@ -278,17 +314,17 @@ export function Storefront({
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
           <div className="min-w-0">
             <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
-              {activeCategory === "All" ? "All products" : activeCategory}
+              {activeCategoryName ?? "All products"}
             </h2>
             <p className="text-sm text-slate-500">
               {visibleProducts.length} {visibleProducts.length === 1 ? "item" : "items"} available
             </p>
           </div>
-          {(query || activeCategory !== "All") && (
+          {(query || activeCategory !== ALL_CATEGORIES) && (
             <button
               onClick={() => {
                 setQuery("");
-                setActiveCategory("All");
+                setActiveCategory(ALL_CATEGORIES);
               }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
             >
@@ -299,10 +335,16 @@ export function Storefront({
 
         {products.length === 0 ? (
           <div className="store-fade-up rounded-3xl border border-slate-200 bg-white p-16 text-center shadow-sm">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">🛍️</div>
-            <h2 className="mt-4 text-xl font-bold text-slate-900">Nothing on the shelves yet</h2>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">
+              {loadError ? "⚠️" : "🛍️"}
+            </div>
+            <h2 className="mt-4 text-xl font-bold text-slate-900">
+              {loadError ? "We couldn't load the store" : "Nothing on the shelves yet"}
+            </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-              Our team is stocking the online store. Check back soon — new products appear here first.
+              {loadError
+                ? "The store is temporarily unavailable. Please refresh in a moment or call us to order."
+                : "Our team is stocking the online store. Check back soon — new products appear here first."}
             </p>
             {storePhone && (
               <p className="mt-4 text-sm text-slate-500">
@@ -318,7 +360,7 @@ export function Storefront({
             <button
               onClick={() => {
                 setQuery("");
-                setActiveCategory("All");
+                setActiveCategory(ALL_CATEGORIES);
               }}
               className="mt-5 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-95"
             >

@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
-import { Sale, SaleReturn, InventoryMovement, ISaleItemSnapshot } from "@/models";
-import { round2 } from "@/lib/commerce";
+import { Sale, SaleReturn, InventoryMovement, ISaleItemSnapshot, ISaleReturnItemSnapshot } from "@/models";
+import { computeBonusReversal, round2 } from "@/lib/commerce";
 import { appendLedgerEntry } from "@/lib/customer-ledger";
+import { appendBonusEntry } from "@/lib/bonus";
+import { getStoreSettings } from "@/lib/settings";
+import { applyEmployeePurchaseReturn } from "@/lib/employee-purchase";
 import { recordCashMovementIfDrawerOpen } from "@/lib/finance-service";
 import { connectDB } from "@/lib/mongodb";
 
@@ -9,27 +12,39 @@ import { connectDB } from "@/lib/mongodb";
  * Sale return service.
  *
  * Rules enforced here:
- *  - Cannot return more than originally sold (accounting for previous approved returns).
+ *  - Cannot return more than originally sold (accounting for previous approved
+ *    and pending returns, per original sale line).
  *  - Original sale is never modified or deleted.
- *  - Returned stock creates CUSTOMER_RETURN_IN inventory movements.
- *  - Refunds create a REFUND customer ledger entry when the customer is on credit.
- *  - Duplicate return processing is prevented by re-validating quantities inside the transaction.
+ *  - Only inventory lines marked `restock` re-enter stock; direct-sale lines
+ *    never touch the inventory ledger.
+ *  - Refunds are priced from the original sale snapshot (including wholesale
+ *    prices, discounts and tax actually charged).
+ *  - Reward credit earned by the sale is reversed proportionally.
+ *  - Duplicate processing is prevented by a unique clientTransactionId plus
+ *    quantity re-validation inside the transaction.
  *  - Manager approval is required when the settings flag `returns.requireApproval` is on.
  */
 
 export type ReturnItemInput = {
-  productId: string;
+  /** Original sale line id — required to distinguish duplicate product lines. */
+  lineId?: string;
+  /** Backwards-compatible identifier for inventory lines. */
+  productId?: string;
   quantity: number;
+  /** Inventory lines only; default true. Direct lines are never restocked. */
+  restock?: boolean;
 };
 
 export type CreateReturnInput = {
   saleId: string;
   userId: string;
   items: ReturnItemInput[];
-  refundMethod: "cash" | "original" | "credit";
+  refundMethod: "cash" | "original" | "credit" | "card" | "transfer";
   reason: string;
   note?: string;
   requireApproval?: boolean;
+  /** Idempotency key for POS submissions. */
+  clientTransactionId?: string | null;
 };
 
 export class ReturnValidationError extends Error {
@@ -40,103 +55,428 @@ export class ReturnValidationError extends Error {
   }
 }
 
+type SaleWithLines = {
+  _id: mongoose.Types.ObjectId;
+  invoiceNumber: string;
+  branchId: mongoose.Types.ObjectId | null;
+  customerId: mongoose.Types.ObjectId | null;
+  paymentMethod: string | null;
+  payments: Array<{ method: string; amount: number }>;
+  items: Array<ISaleItemSnapshot & { _id?: mongoose.Types.ObjectId }>;
+  total: number;
+  bonusEarned: number;
+  bonusRedeemed?: number;
+};
+
+function lineIdOf(line: ISaleItemSnapshot & { _id?: mongoose.Types.ObjectId }): string {
+  return line._id ? line._id.toString() : `${line.productId ?? "direct"}:${line.sku}:${line.name}`;
+}
+
+/**
+ * Previously returned quantities, keyed by original sale line id. Legacy return
+ * rows without `sourceLineId` fall back to the first matching product line.
+ */
 export async function getReturnedQuantities(
   saleId: string,
-  session?: mongoose.ClientSession | null
+  session?: mongoose.ClientSession | null,
+  excludeReturnId?: string | null
 ): Promise<Map<string, number>> {
-  const pipeline = [
-    { $match: { saleId: new mongoose.Types.ObjectId(saleId), status: { $in: ["pending", "approved"] } } },
-    { $unwind: "$items" },
-    {
-      $group: {
-        _id: "$items.productId",
-        quantity: { $sum: "$items.quantity" },
-      },
-    },
-  ];
-  const results = session
-    ? await SaleReturn.aggregate(pipeline).session(session)
-    : await SaleReturn.aggregate(pipeline);
+  const query: Record<string, unknown> = {
+    saleId: new mongoose.Types.ObjectId(saleId),
+    status: { $in: ["pending", "approved"] },
+  };
+  if (excludeReturnId && mongoose.isValidObjectId(excludeReturnId)) {
+    query._id = { $ne: new mongoose.Types.ObjectId(excludeReturnId) };
+  }
+
+  const returns = await SaleReturn.find(query)
+    .select("items")
+    .session(session ?? null)
+    .lean();
 
   const map = new Map<string, number>();
-  for (const r of results) {
-    map.set(r._id.toString(), r.quantity);
+  for (const saleReturn of returns) {
+    for (const item of saleReturn.items) {
+      const key = item.sourceLineId || (item.productId ? `product:${item.productId.toString()}` : "");
+      if (!key) continue;
+      map.set(key, round2((map.get(key) ?? 0) + item.quantity));
+    }
   }
   return map;
+}
+
+/**
+ * Validates requested returns against the original sale lines and returns
+ * immutable snapshots priced exactly as the customer originally paid.
+ */
+export async function buildReturnItems(
+  sale: SaleWithLines,
+  requested: ReturnItemInput[],
+  session: mongoose.ClientSession,
+  excludeReturnId?: string | null
+): Promise<{ items: ISaleReturnItemSnapshot[]; subtotal: number }> {
+  if (!requested || requested.length === 0) {
+    throw new ReturnValidationError("EMPTY_RETURN", "At least one item is required for a return");
+  }
+
+  const returnedMap = await getReturnedQuantities(sale._id.toString(), session, excludeReturnId);
+
+  const lines = sale.items.map((line) => {
+    const lineId = lineIdOf(line);
+    const sold = line.quantity;
+    const legacyKey = line.productId ? `product:${line.productId.toString()}` : "";
+    const already = round2((returnedMap.get(lineId) ?? 0) + (legacyKey ? returnedMap.get(legacyKey) ?? 0 : 0));
+    return { line, lineId, sold, already, remaining: round2(sold - already) };
+  });
+
+  const result: ISaleReturnItemSnapshot[] = [];
+
+  for (const request of requested) {
+    const target = request.lineId
+      ? lines.find((l) => l.lineId === request.lineId)
+      : request.productId
+        ? lines.find((l) => l.line.productId?.toString() === request.productId && l.remaining > 0)
+        : undefined;
+
+    if (!target) {
+      throw new ReturnValidationError("ITEM_NOT_ON_SALE", "Returned item was not part of the original sale");
+    }
+    if (!Number.isInteger(request.quantity) || request.quantity < 1) {
+      throw new ReturnValidationError("INVALID_QUANTITY", "Return quantity must be a whole number of at least 1");
+    }
+    if (request.quantity > target.remaining + 0.001) {
+      throw new ReturnValidationError(
+        "EXCEEDS_SOLD_QUANTITY",
+        `Cannot return ${request.quantity} of ${target.line.name}: only ${target.remaining} remaining returnable`
+      );
+    }
+
+    const item = target.line;
+    // Snapshot from the ORIGINAL sale — price the customer actually paid,
+    // including wholesale pricing, discounts and tax.
+    const lineTotal = round2(item.subtotal * (request.quantity / item.quantity));
+    const isInventory = (item.itemType ?? "inventory") === "inventory" && Boolean(item.productId);
+    result.push({
+      productId: item.productId ?? null,
+      itemType: item.itemType ?? "inventory",
+      sourceLineId: target.lineId,
+      restock: isInventory && request.restock !== false,
+      pricingMode: item.pricingMode ?? "retail",
+      name: item.name,
+      sku: item.sku,
+      quantity: request.quantity,
+      sellingPrice: item.sellingPrice,
+      costPrice: item.costPrice,
+      discount: round2(item.discount * (request.quantity / item.quantity)),
+      tax: round2(item.tax * (request.quantity / item.quantity)),
+      subtotal: lineTotal,
+      // Keep the line's department so returns reduce the department that sold it.
+      departmentId: item.departmentId ?? null,
+      departmentName: item.departmentName ?? "",
+    });
+    target.remaining = round2(target.remaining - request.quantity);
+  }
+
+  const subtotal = round2(result.reduce((sum, i) => sum + i.subtotal, 0));
+  return { items: result, subtotal };
+}
+
+/** Re-enters eligible inventory lines from a return. Never restocks direct lines. */
+export async function restockReturnItems(
+  saleReturn: {
+    _id: mongoose.Types.ObjectId;
+    returnNumber: string;
+    branchId: mongoose.Types.ObjectId | null;
+    items: Array<ISaleReturnItemSnapshot>;
+  },
+  saleInvoiceNumber: string,
+  userId: string,
+  session: mongoose.ClientSession
+) {
+  const movements = saleReturn.items
+    .filter((item) => item.itemType !== "direct" && item.restock !== false && item.productId)
+    .map((item) => ({
+      productId: item.productId,
+      branchId: saleReturn.branchId,
+      movementType: "CUSTOMER_RETURN_IN" as const,
+      quantity: item.quantity,
+      unitCost: item.costPrice,
+      referenceType: "return" as const,
+      referenceId: saleReturn._id,
+      note: `Return ${saleReturn.returnNumber} for ${saleInvoiceNumber}`,
+      userId: new mongoose.Types.ObjectId(userId),
+    }));
+  if (movements.length > 0) {
+    await InventoryMovement.insertMany(movements, { session });
+  }
+}
+
+/**
+ * Proportional reward-credit clawback. Only approved returns reverse credit;
+ * pending returns do nothing until approval.
+ */
+export async function reverseBonusForReturn(
+  sale: SaleWithLines,
+  saleReturn: {
+    _id: mongoose.Types.ObjectId;
+    returnNumber: string;
+    total: number;
+    bonusReversed?: number;
+  },
+  userId: string,
+  session: mongoose.ClientSession
+): Promise<number> {
+  if (!sale.customerId || !sale.bonusEarned || sale.bonusEarned <= 0) return 0;
+
+  const prior = await SaleReturn.find({
+    saleId: sale._id,
+    status: "approved",
+    _id: { $ne: saleReturn._id },
+  })
+    .select("bonusReversed")
+    .session(session)
+    .lean();
+  const alreadyReversed = round2(prior.reduce((sum, r) => sum + (r.bonusReversed ?? 0), 0));
+
+  const amount = computeBonusReversal({
+    earned: sale.bonusEarned,
+    refundAmount: saleReturn.total,
+    saleTotal: sale.total,
+    alreadyReversed,
+  });
+  if (amount <= 0) return 0;
+
+  await appendBonusEntry(
+    {
+      customerId: sale.customerId.toString(),
+      branchId: sale.branchId ? sale.branchId.toString() : null,
+      type: "REVERSAL",
+      amount: -amount,
+      referenceType: "sale_return",
+      referenceId: saleReturn._id.toString(),
+      description: `Reward credit reversed on return ${saleReturn.returnNumber}`,
+      userId,
+      idempotencyKey: `return:${saleReturn._id.toString()}:reverse`,
+    },
+    session
+  );
+  return amount;
+}
+
+async function applyApprovedReturnSideEffects(
+  sale: SaleWithLines,
+  saleReturn: {
+    _id: mongoose.Types.ObjectId;
+    returnNumber: string;
+    branchId: mongoose.Types.ObjectId | null;
+    customerId: mongoose.Types.ObjectId | null;
+    items: ISaleReturnItemSnapshot[];
+    total: number;
+    refundMethod: string;
+    note?: string | null;
+    bonusReversed?: number;
+    bonusRestored?: number;
+  },
+  userId: string,
+  session: mongoose.ClientSession
+) {
+  await restockReturnItems(
+    {
+      _id: saleReturn._id,
+      returnNumber: saleReturn.returnNumber,
+      branchId: saleReturn.branchId ?? sale.branchId,
+      items: saleReturn.items,
+    },
+    sale.invoiceNumber,
+    userId,
+    session
+  );
+
+  // Financial transaction: refund settling a credit sale reduces customer debt.
+  if (sale.customerId) {
+    const isCreditSettlement = saleReturn.refundMethod === "credit" || sale.paymentMethod === "credit" || hasCreditPayment(sale);
+    if (isCreditSettlement) {
+      await appendLedgerEntry(
+        {
+          customerId: sale.customerId.toString(),
+          branchId: sale.branchId ? sale.branchId.toString() : null,
+          type: "REFUND",
+          amount: -saleReturn.total,
+          referenceType: "sale_return",
+          referenceId: saleReturn._id.toString(),
+          description:
+            saleReturn.refundMethod === "credit"
+              ? `Refund (store credit) for ${sale.invoiceNumber} — ${saleReturn.returnNumber}`
+              : `Refund for ${sale.invoiceNumber} — ${saleReturn.returnNumber}`,
+          userId,
+        },
+        session
+      );
+    }
+  }
+
+  // Cash refunds physically leave the drawer.
+  if (resolveRefundMethod(sale, saleReturn.refundMethod) === "cash") {
+    await recordCashMovementIfDrawerOpen(
+      {
+        userId,
+        branchId: sale.branchId ? sale.branchId.toString() : null,
+        type: "refund",
+        amount: -saleReturn.total,
+        description: `Refund ${saleReturn.returnNumber} for ${sale.invoiceNumber}`,
+        referenceType: "sale_return",
+        referenceId: saleReturn._id.toString(),
+      },
+      session
+    );
+  }
+
+  saleReturn.bonusReversed = await reverseBonusForReturn(sale, saleReturn, userId, session);
+  saleReturn.bonusRestored = await restoreBonusForReturn(sale, saleReturn, userId, session);
+
+  // Employee purchases are recovered from salary: a return reduces what the
+  // employee still owes. Already-deducted amounts become a credit instead of
+  // rewriting finalized payroll.
+  const employeeAdjustment = await applyEmployeePurchaseReturn({
+    saleId: sale._id.toString(),
+    refundAmount: saleReturn.total,
+    returnId: saleReturn._id.toString(),
+    userId,
+    approvedBy: userId,
+  });
+  if (employeeAdjustment) {
+    saleReturn.note = [saleReturn.note, `Employee balance reduced by ${employeeAdjustment.adjusted}`]
+      .filter(Boolean)
+      .join(" · ");
+  }
+}
+
+/**
+ * Gives back reward credit the customer spent on the original sale, in the
+ * same proportion as the refunded value, when the refund policy allows it.
+ * Cumulative restoration can never exceed what was originally redeemed.
+ */
+async function restoreBonusForReturn(
+  sale: SaleWithLines,
+  saleReturn: { _id: mongoose.Types.ObjectId; returnNumber: string; total: number; bonusRestored?: number },
+  userId: string,
+  session: mongoose.ClientSession
+): Promise<number> {
+  const redeemed = round2(sale.bonusRedeemed ?? 0);
+  if (!sale.customerId || redeemed <= 0 || sale.total <= 0) return 0;
+
+  const settings = await getStoreSettings(sale.branchId ? sale.branchId.toString() : null);
+  if (!settings.bonusRestoreRedeemedOnRefund) return 0;
+
+  const prior = await SaleReturn.find({
+    saleId: sale._id,
+    status: "approved",
+    _id: { $ne: saleReturn._id },
+  })
+    .select("bonusRestored")
+    .session(session)
+    .lean();
+  const alreadyRestored = round2(prior.reduce((sum, r) => sum + (r.bonusRestored ?? 0), 0));
+
+  const share = Math.min(1, Math.max(0, saleReturn.total / sale.total));
+  const amount = round2(Math.min(redeemed - alreadyRestored, round2(redeemed * share)));
+  if (amount <= 0) return 0;
+
+  await appendBonusEntry(
+    {
+      customerId: sale.customerId.toString(),
+      branchId: sale.branchId ? sale.branchId.toString() : null,
+      type: "RESTORE",
+      amount,
+      referenceType: "sale_return",
+      referenceId: saleReturn._id.toString(),
+      description: `Reward credit restored on return ${saleReturn.returnNumber}`,
+      userId,
+      idempotencyKey: `return:${saleReturn._id.toString()}:restore`,
+    },
+    session
+  );
+  return amount;
+}
+
+function hasCreditPayment(sale: { payments: Array<{ method: string; amount: number }> }): boolean {
+  return (sale.payments ?? []).some((p) => p.method === "credit" && p.amount > 0);
+}
+
+/** Resolves `original` to the tender the customer actually used. */
+export function resolveRefundMethod(
+  sale: { paymentMethod: string | null; payments: Array<{ method: string; amount: number }> },
+  requested: string
+): string {
+  if (requested !== "original") return requested;
+  if (sale.paymentMethod === "cash") return "cash";
+  if (sale.paymentMethod === "credit") return "credit";
+  if (sale.paymentMethod === "mixed") {
+    return (sale.payments ?? []).some((p) => p.method === "cash") ? "cash" : "card";
+  }
+  return sale.paymentMethod ?? "cash";
+}
+
+function makeReturnNumber(): string {
+  return `RET-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${Date.now().toString().slice(-8)}`;
 }
 
 export async function createSaleReturn(input: CreateReturnInput) {
   await connectDB();
 
   const session = await mongoose.startSession();
-  let created: { id: string; returnNumber: string; total: number; status: string; refundAmount: number };
+  let created: {
+    id: string;
+    returnNumber: string;
+    total: number;
+    status: string;
+    refundAmount: number;
+    bonusReversed: number;
+  };
 
   try {
     await session.withTransaction(async () => {
+      if (input.clientTransactionId) {
+        const existing = await SaleReturn.findOne({ clientTransactionId: input.clientTransactionId }).session(session).lean();
+        if (existing) {
+          created = {
+            id: existing._id.toString(),
+            returnNumber: existing.returnNumber,
+            total: existing.total,
+            status: existing.status,
+            refundAmount: existing.total,
+            bonusReversed: existing.bonusReversed ?? 0,
+          };
+          return;
+        }
+      }
+
       const sale = await Sale.findOne({ _id: input.saleId, status: "completed" }).session(session);
       if (!sale) {
         throw new ReturnValidationError("SALE_NOT_FOUND", "Sale not found or not eligible for return");
       }
 
-      if (!input.items || input.items.length === 0) {
-        throw new ReturnValidationError("EMPTY_RETURN", "At least one item is required for a return");
-      }
-
-      // Previously returned quantities (approved + pending returns count toward the limit)
-      const returnedMap = await getReturnedQuantities(input.saleId, session);
-
-      const saleItemMap = new Map<string, ISaleItemSnapshot>(
-        sale.items.map((i) => [i.productId.toString(), i])
-      );
-
-      const returnItems: ISaleItemSnapshot[] = [];
-      for (const item of input.items) {
-        const saleItem = saleItemMap.get(item.productId);
-        if (!saleItem) {
-          throw new ReturnValidationError("ITEM_NOT_ON_SALE", "Returned item was not part of the original sale");
-        }
-        if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-          throw new ReturnValidationError("INVALID_QUANTITY", "Return quantity must be a whole number of at least 1");
-        }
-        const alreadyReturned = returnedMap.get(item.productId) ?? 0;
-        if (alreadyReturned + item.quantity > saleItem.quantity) {
-          throw new ReturnValidationError(
-            "EXCEEDS_SOLD_QUANTITY",
-            `Cannot return ${item.quantity} of ${saleItem.name}: only ${saleItem.quantity - alreadyReturned} remaining returnable`
-          );
-        }
-        // Snapshot from the ORIGINAL sale — price the customer actually paid
-        const lineTotal = round2(saleItem.subtotal * (item.quantity / saleItem.quantity));
-        returnItems.push({
-          productId: saleItem.productId,
-          name: saleItem.name,
-          sku: saleItem.sku,
-          quantity: item.quantity,
-          sellingPrice: saleItem.sellingPrice,
-          costPrice: saleItem.costPrice,
-          discount: saleItem.discount,
-          tax: saleItem.tax,
-          subtotal: lineTotal,
-        });
-      }
-
-      const subtotal = round2(returnItems.reduce((sum, i) => sum + i.subtotal, 0));
-
-      // refund amounts — proportional part of item tax/discount already inside subtotal
+      const { items: returnItems, subtotal } = await buildReturnItems(sale as unknown as SaleWithLines, input.items, session);
       const refundAmount = subtotal;
 
       const requireApproval = input.requireApproval ?? false;
       const status: "pending" | "approved" = requireApproval ? "pending" : "approved";
-      const returnNumber = `RET-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${Date.now().toString().slice(-8)}`;
+      const returnNumber = makeReturnNumber();
 
       const returnDocs = await SaleReturn.create(
         [
           {
             returnNumber,
+            clientTransactionId: input.clientTransactionId ?? null,
             saleId: sale._id,
             branchId: sale.branchId,
             customerId: sale.customerId,
             userId: input.userId,
+            // Snapshot the original sale's attribution so refunds are reported
+            // against the department that actually made the sale.
+            employeeId: sale.employeeId ?? sale.cashierId,
+            departmentId: sale.departmentId ?? null,
+            departmentName: sale.departmentName ?? "",
             status,
             items: returnItems,
             subtotal,
@@ -146,6 +486,9 @@ export async function createSaleReturn(input: CreateReturnInput) {
             refundMethod: input.refundMethod,
             reason: input.reason.slice(0, 300),
             note: (input.note ?? "").slice(0, 300),
+            replacementTotal: 0,
+            netAmount: -refundAmount,
+            bonusReversed: 0,
             approvedBy: status === "approved" ? input.userId : null,
             approvedAt: status === "approved" ? new Date() : null,
           },
@@ -154,74 +497,14 @@ export async function createSaleReturn(input: CreateReturnInput) {
       );
       const saleReturn = returnDocs[0];
 
-      // Side effects only once the return is approved
       if (status === "approved") {
-        // Stock re-entry
-        const movementDocs = returnItems.map((item) => ({
-          productId: item.productId,
-          branchId: sale.branchId,
-          movementType: "CUSTOMER_RETURN_IN",
-          quantity: item.quantity,
-          unitCost: item.costPrice,
-          referenceType: "return",
-          referenceId: saleReturn._id,
-          note: `Return ${returnNumber} for ${sale.invoiceNumber}`,
-          userId: new mongoose.Types.ObjectId(input.userId),
-        }));
-        await InventoryMovement.insertMany(movementDocs, { session });
-
-        // Financial transaction: refund to customer
-        if (sale.customerId) {
-          if (input.refundMethod === "credit") {
-            // Store credit → the customer's outstanding balance decreases
-            await appendLedgerEntry(
-              {
-                customerId: sale.customerId.toString(),
-                branchId: sale.branchId ? sale.branchId.toString() : null,
-                type: "REFUND",
-                amount: -refundAmount,
-                referenceType: "sale_return",
-                referenceId: saleReturn._id.toString(),
-                description: `Refund (store credit) for ${sale.invoiceNumber} — ${returnNumber}`,
-                userId: input.userId,
-              },
-              session
-            );
-          } else if (sale.paymentMethod === "credit" || hasCreditPayment(sale)) {
-            // The original sale had an outstanding credit portion; paying cash/original
-            // also settles their balance.
-            await appendLedgerEntry(
-              {
-                customerId: sale.customerId.toString(),
-                branchId: sale.branchId ? sale.branchId.toString() : null,
-                type: "REFUND",
-                amount: -refundAmount,
-                referenceType: "sale_return",
-                referenceId: saleReturn._id.toString(),
-                description: `Refund for ${sale.invoiceNumber} — ${returnNumber}`,
-                userId: input.userId,
-              },
-              session
-            );
-          }
-        }
-
-        // Cash refunds physically leave the drawer (recorded even when the customer
-        // paid by card — the drawer is the source of truth for cash on hand).
-        if (input.refundMethod === "cash") {
-          await recordCashMovementIfDrawerOpen(
-            {
-              userId: input.userId,
-              branchId: sale.branchId ? sale.branchId.toString() : null,
-              type: "refund",
-              amount: -refundAmount,
-              description: `Refund ${returnNumber} for ${sale.invoiceNumber}`,
-              referenceType: "sale_return",
-              referenceId: saleReturn._id.toString(),
-            },
-            session
-          );
-        }
+        await applyApprovedReturnSideEffects(
+          sale as unknown as SaleWithLines,
+          saleReturn as unknown as Parameters<typeof applyApprovedReturnSideEffects>[1],
+          input.userId,
+          session
+        );
+        await saleReturn.save({ session });
       }
 
       created = {
@@ -230,6 +513,7 @@ export async function createSaleReturn(input: CreateReturnInput) {
         total: refundAmount,
         status,
         refundAmount,
+        bonusReversed: saleReturn.bonusReversed ?? 0,
       };
     });
   } finally {
@@ -239,10 +523,6 @@ export async function createSaleReturn(input: CreateReturnInput) {
   return created!;
 }
 
-function hasCreditPayment(sale: { payments: Array<{ method: string; amount: number }> }): boolean {
-  return (sale.payments ?? []).some((p) => p.method === "credit" && p.amount > 0);
-}
-
 /**
  * Approves or rejects a pending return (manager action).
  * Side effects are applied at approval time.
@@ -250,7 +530,7 @@ function hasCreditPayment(sale: { payments: Array<{ method: string; amount: numb
 export async function approveSaleReturn(returnId: string, approverUserId: string) {
   await connectDB();
   const session = await mongoose.startSession();
-  let result: { id: string; status: string };
+  let result: { id: string; status: string; bonusReversed: number };
 
   try {
     await session.withTransaction(async () => {
@@ -264,71 +544,38 @@ export async function approveSaleReturn(returnId: string, approverUserId: string
         throw new ReturnValidationError("SALE_NOT_FOUND", "Original sale not found");
       }
 
-      // Re-validate returnable quantities at approval time
-      const returnedMap = await getReturnedQuantities(saleReturn.saleId.toString(), session);
-      const saleItemMap = new Map<string, ISaleItemSnapshot>(sale.items.map((i) => [i.productId.toString(), i]));
-      for (const item of saleReturn.items) {
-        const saleItem = saleItemMap.get(item.productId.toString());
-        const alreadyReturned = returnedMap.get(item.productId.toString()) ?? 0;
-        const thisReturnCount = item.quantity;
-        if (!saleItem || alreadyReturned + thisReturnCount > saleItem.quantity) {
-          throw new ReturnValidationError("EXCEEDS_SOLD_QUANTITY", "Approval would exceed the originally sold quantity");
-        }
-      }
+      // Re-validate returnable quantities at approval time using the stored
+      // line references, excluding this pending return itself.
+      await buildReturnItems(
+        sale as unknown as SaleWithLines,
+        saleReturn.items.map((item) => ({
+          lineId: item.sourceLineId || undefined,
+          productId: item.productId?.toString(),
+          quantity: item.quantity,
+          restock: item.restock,
+        })),
+        session,
+        saleReturn._id.toString()
+      );
 
       saleReturn.status = "approved";
       saleReturn.approvedBy = new mongoose.Types.ObjectId(approverUserId);
       saleReturn.approvedAt = new Date();
       await saleReturn.save({ session });
 
-      const refundAmount = saleReturn.total;
+      await applyApprovedReturnSideEffects(
+        sale as unknown as SaleWithLines,
+        saleReturn as unknown as Parameters<typeof applyApprovedReturnSideEffects>[1],
+        approverUserId,
+        session
+      );
+      await saleReturn.save({ session });
 
-      const movementDocs = saleReturn.items.map((item) => ({
-        productId: item.productId,
-        branchId: saleReturn.branchId,
-        movementType: "CUSTOMER_RETURN_IN",
-        quantity: item.quantity,
-        unitCost: item.costPrice,
-        referenceType: "return",
-        referenceId: saleReturn._id,
-        note: `Return ${saleReturn.returnNumber} for ${sale.invoiceNumber}`,
-        userId: new mongoose.Types.ObjectId(approverUserId),
-      }));
-      await InventoryMovement.insertMany(movementDocs, { session });
-
-      if (sale.customerId && (sale.paymentMethod === "credit" || hasCreditPayment(sale))) {
-        await appendLedgerEntry(
-          {
-            customerId: sale.customerId.toString(),
-            branchId: saleReturn.branchId ? saleReturn.branchId.toString() : null,
-            type: "REFUND",
-            amount: -refundAmount,
-            referenceType: "sale_return",
-            referenceId: saleReturn._id.toString(),
-            description: `Refund for ${sale.invoiceNumber} — ${saleReturn.returnNumber}`,
-            userId: approverUserId,
-          },
-          session
-        );
-      }
-
-      // Cash refunds physically leave the drawer — same rule as the instant path.
-      if (saleReturn.refundMethod === "cash") {
-        await recordCashMovementIfDrawerOpen(
-          {
-            userId: approverUserId,
-            branchId: saleReturn.branchId ? saleReturn.branchId.toString() : null,
-            type: "refund",
-            amount: -refundAmount,
-            description: `Refund ${saleReturn.returnNumber} for ${sale.invoiceNumber}`,
-            referenceType: "sale_return",
-            referenceId: saleReturn._id.toString(),
-          },
-          session
-        );
-      }
-
-      result = { id: saleReturn._id.toString(), status: "approved" };
+      result = {
+        id: saleReturn._id.toString(),
+        status: "approved",
+        bonusReversed: saleReturn.bonusReversed ?? 0,
+      };
     });
   } finally {
     await session.endSession();
@@ -349,3 +596,5 @@ export async function rejectSaleReturn(returnId: string, approverUserId: string)
   await saleReturn.save();
   return { id: saleReturn._id.toString(), status: "rejected" };
 }
+
+export type { ISaleReturnItemSnapshot };

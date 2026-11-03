@@ -18,6 +18,9 @@ const createSchema = z.object({
   address: z.string().max(500).default(""),
   notes: z.string().max(2000).default(""),
   status: z.enum(["active", "inactive"]).default("active"),
+  /** Admin-controlled wholesale eligibility and reward percentage. */
+  wholesaleEligible: z.boolean().optional(),
+  bonusPercent: z.number().min(0, "Bonus percent cannot be negative").max(100, "Bonus percent cannot exceed 100").optional(),
   branchId: z.string().nullable().optional(),
 });
 
@@ -139,6 +142,12 @@ export async function POST(req: NextRequest) {
       customer.address = (data.address ?? "").trim();
       customer.notes = (data.notes ?? "").trim();
       customer.status = data.status;
+      const before = {
+        wholesaleEligible: customer.wholesaleEligible,
+        bonusPercent: customer.bonusPercent,
+      };
+      if (data.wholesaleEligible !== undefined) customer.wholesaleEligible = data.wholesaleEligible;
+      if (data.bonusPercent !== undefined) customer.bonusPercent = data.bonusPercent;
       await customer.save();
       await recordAuditLog({
         user,
@@ -146,6 +155,10 @@ export async function POST(req: NextRequest) {
         entityType: "customer",
         entityId: customer._id.toString(),
         branchId: customer.branchId?.toString(),
+        changes: {
+          wholesaleEligible: { before: before.wholesaleEligible, after: customer.wholesaleEligible },
+          bonusPercent: { before: before.bonusPercent, after: customer.bonusPercent },
+        },
         note: "Customer updated",
         ...meta,
       });
@@ -159,6 +172,8 @@ export async function POST(req: NextRequest) {
       address: (data.address ?? "").trim(),
       notes: (data.notes ?? "").trim(),
       status: data.status,
+      wholesaleEligible: data.wholesaleEligible ?? false,
+      bonusPercent: data.bonusPercent ?? 0,
       branchId: data.branchId ?? user.branchId,
     });
 

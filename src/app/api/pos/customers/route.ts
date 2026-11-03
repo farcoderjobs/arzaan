@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/session";
 import { hasAnyPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getCustomerBalance } from "@/lib/customer-ledger";
+import { getCustomerBonusBalance } from "@/lib/bonus";
 
 /** Quick customer search for the POS customer picker. */
 export async function GET(req: NextRequest) {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     const customers = await Customer.find(query)
       .sort({ name: 1 })
       .limit(limit)
-      .select("name phone")
+      .select("name phone wholesaleEligible bonusPercent")
       .lean();
 
     const results = await Promise.all(
@@ -45,6 +46,9 @@ export async function GET(req: NextRequest) {
         name: c.name,
         phone: c.phone,
         balance: await getCustomerBalance(c._id.toString()),
+        wholesaleEligible: c.wholesaleEligible === true,
+        bonusPercent: c.bonusPercent ?? 0,
+        bonusBalance: await getCustomerBonusBalance(c._id.toString()),
       }))
     );
 

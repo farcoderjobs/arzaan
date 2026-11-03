@@ -29,12 +29,15 @@ const NAV_SECTIONS: Array<{ labelKey: keyof Dictionary["nav"]; items: NavItem[] 
       { labelKey: "products", href: "/products", icon: "📦", permission: "products" },
       { labelKey: "categories", href: "/categories", icon: "🏷️", permission: "categories" },
       { labelKey: "inventory", href: "/inventory", icon: "📋", permission: "inventory" },
+      { labelKey: "warehouses", href: "/warehouses", icon: "🏗️", permission: ["inventory", "transfers"] },
+      { labelKey: "departments", href: "/departments", icon: "🏬", permission: "departments" },
     ],
   },
   {
     labelKey: "procurement",
     items: [
       { labelKey: "purchases", href: "/purchases", icon: "📥", permission: "purchases" },
+      { labelKey: "transfers", href: "/transfers", icon: "🚚", permission: "transfers" },
       { labelKey: "customers", href: "/customers", icon: "👥", permission: "customers" },
       { labelKey: "suppliers", href: "/suppliers", icon: "🏭", permission: "suppliers" },
       { labelKey: "sales", href: "/sales", icon: "🧾", permission: "sales" },
@@ -45,6 +48,9 @@ const NAV_SECTIONS: Array<{ labelKey: keyof Dictionary["nav"]; items: NavItem[] 
     labelKey: "finance",
     items: [
       { labelKey: "cashRegister", href: "/cash-register", icon: "💵", permission: "cashRegister" },
+      { labelKey: "attendance", href: "/attendance", icon: "🗓️", permission: "attendance" },
+      { labelKey: "payroll", href: "/payroll", icon: "💰", permission: "payroll" },
+      { labelKey: "employeePurchases", href: "/employee-purchases", icon: "🧑‍🍳", permission: "employeePurchases" },
       { labelKey: "finance", href: "/finance", icon: "💳", permission: ["expenses", "cashRegister", "reports"] },
       { labelKey: "reports", href: "/reports", icon: "📈", permission: "reports" },
     ],

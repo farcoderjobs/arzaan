@@ -48,6 +48,13 @@ export async function GET(req: NextRequest) {
       query.description = new RegExp(escapeRegex(search), "i");
     }
 
+    // The header totals must describe the SAME movements the filters select.
+    // Only the unfiltered view hides the closing row (counted cash, not a flow);
+    // a chosen type is applied exactly as asked.
+    const totalsMatch: Record<string, unknown> = query.type
+      ? { ...query }
+      : { ...query, type: { $ne: "closing" } };
+
     const [total, docs, totals] = await Promise.all([
       CashTransaction.countDocuments(query),
       CashTransaction.find(query)
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
         .limit(perPage)
         .lean(),
       CashTransaction.aggregate<{ inflow: number; outflow: number }>([
-        { $match: { ...query, type: { $ne: "closing" } } },
+        { $match: totalsMatch },
         {
           $group: {
             _id: null,

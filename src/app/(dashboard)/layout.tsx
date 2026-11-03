@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/session";
+import { isDatabaseUnavailable } from "@/lib/db-errors";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import { SyncBoot } from "@/components/layout/sync-boot";
+
 
 export default async function DashboardLayout({
   children,
@@ -13,10 +14,10 @@ export default async function DashboardLayout({
   try {
     user = await requireSessionUser();
   } catch (err) {
-    const message = err instanceof Error ? err.message : "UNAUTHORIZED";
-    if (message === "UNAUTHORIZED") {
-      redirect("/login");
-    }
+    // A database that is down is not a signed-out user. Re-throwing hands the
+    // request to the error boundary, which explains how to start the local
+    // MongoDB; redirecting to /login used to make every page look broken.
+    if (isDatabaseUnavailable(err)) throw err;
     redirect("/login");
   }
 
@@ -30,7 +31,6 @@ export default async function DashboardLayout({
           the correct side in RTL locales. */}
       <div className="flex min-w-0 flex-1 flex-col lg:ps-64">
         <Header user={user} />
-        <SyncBoot />
         <main className="flex min-h-0 flex-1 flex-col">
           <div className="mx-auto w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
             {children}

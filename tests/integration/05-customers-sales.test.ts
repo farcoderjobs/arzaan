@@ -205,26 +205,34 @@ describe("POS calculations & checkout", () => {
     expect(res.body.error.message).toMatch(/exceeds the maximum allowed/i);
   });
 
-  it("blocks cashiers without the sales.discount permission from discounting", async () => {
+  it("lets cashiers apply discounts within the configured cap", async () => {
     const product = await seedProduct(20);
 
-    // Sale-level discount
     const saleLevel = await api(cashier.token).post("/api/sales", checkoutPayload({
       items: [{ productId: product._id, quantity: 1 }],
       discount: 5,
       discountType: "amount",
-      payments: [{ method: "card", amount: 20 }],
+      payments: [{ method: "card", amount: 15 }],
     }));
-    expect(saleLevel.status).toBe(403);
-    expect(saleLevel.body.error.message).toMatch(/permission to apply discounts/i);
+    expect(saleLevel.status).toBe(201);
+    expect(saleLevel.body.data.total).toBe(15);
 
-    // Per-line discount
     const lineLevel = await api(cashier.token).post("/api/sales", checkoutPayload({
       items: [{ productId: product._id, quantity: 1, unitDiscount: 5 }],
-      payments: [{ method: "card", amount: 20 }],
+      payments: [{ method: "card", amount: 15 }],
     }));
-    expect(lineLevel.status).toBe(403);
-    expect(lineLevel.body.error.message).toMatch(/permission to apply discounts/i);
+    expect(lineLevel.status).toBe(201);
+    expect(lineLevel.body.data.total).toBe(15);
+
+    // The cap still applies to cashiers (maxCashierDiscountPercent = 10).
+    const overCap = await api(cashier.token).post("/api/sales", checkoutPayload({
+      items: [{ productId: product._id, quantity: 1 }],
+      discount: 15,
+      discountType: "percent",
+      payments: [{ method: "card", amount: 17 }],
+    }));
+    expect(overCap.status).toBe(400);
+    expect(overCap.body.error.message).toMatch(/exceeds the maximum allowed/i);
   });
 
   it("applies per-line discounts and never trusts client totals", async () => {

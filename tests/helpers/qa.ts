@@ -66,7 +66,7 @@ export async function connectDb(): Promise<mongoose.Connection> {
   return mongoose.connection;
 }
 
-const STOCK_IN_TYPES = ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN"];
+const STOCK_IN_TYPES = ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN", "TRANSFER_IN"];
 
 /** Source-of-truth stock: sum of inventory movements (same rule as the POS). */
 export async function dbStock(productId: string, branchId?: string | null): Promise<number> {
@@ -274,10 +274,12 @@ export async function openRegister(token: string, openCash = 0): Promise<string>
 /** Standard checkout payload — totals are always recomputed server-side. */
 export function checkoutPayload(opts: {
   items: Array<{ productId: string; quantity: number; unitDiscount?: number }>;
+  directItems?: Array<{ description: string; quantity: number; unitPrice: number; unitCost?: number; taxRate?: number }>;
   customerId?: string | null;
   discount?: number;
   discountType?: "amount" | "percent";
-  payments?: Array<{ method: "cash" | "card" | "transfer" | "credit"; amount: number; reference?: string }>;
+  pricingMode?: "retail" | "wholesale";
+  payments?: Array<{ method: "cash" | "card" | "transfer" | "credit" | "bonus"; amount: number; reference?: string }>;
   clientTransactionId?: string;
   note?: string;
   status?: "completed" | "held";
@@ -285,8 +287,10 @@ export function checkoutPayload(opts: {
   return {
     customerId: opts.customerId ?? null,
     items: opts.items,
+    directItems: opts.directItems ?? [],
     discount: opts.discount ?? 0,
     discountType: opts.discountType ?? "amount",
+    pricingMode: opts.pricingMode ?? "retail",
     payments: opts.payments ?? [],
     note: opts.note ?? "",
     status: opts.status ?? "completed",

@@ -12,6 +12,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       customerId={id}
       canPayment={user.permissions.includes("customers.payment")}
       canViewSales={user.permissions.includes("sales.view")}
+      canEdit={user.permissions.includes("customers.update")}
+      canAdjustBonus={user.permissions.includes("bonus.adjust")}
     />
   );
 }

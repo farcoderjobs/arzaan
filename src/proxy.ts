@@ -31,6 +31,11 @@ const PROTECTED_ROUTES = ["/dashboard", "/pos", "/products", "/inventory", "/pur
  *  - /api/store/products    → public storefront catalog
  *  - /api/store/orders      → public storefront checkout (exact path only —
  *                             /api/store/orders/admin stays authenticated)
+ *  - /api/sync/push|pull    → shop-node ingestion. These are called
+ *                             server-to-server by a node's sync worker, which
+ *                             has no session cookie; each handler authenticates
+ *                             the node id + secret itself and rejects an
+ *                             unknown or inactive node with a 401.
  * Everything else under /api requires a valid pos_access_token.
  */
 const PUBLIC_API_EXACT = new Set([
@@ -38,6 +43,8 @@ const PUBLIC_API_EXACT = new Set([
   "/api/seed",
   "/api/store/products",
   "/api/store/orders",
+  "/api/sync/push",
+  "/api/sync/pull",
 ]);
 const PUBLIC_API_PREFIXES = ["/api/auth/"];
 

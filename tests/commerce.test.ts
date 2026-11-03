@@ -6,16 +6,15 @@ import {
   computeSaleTotals,
   validatePayments,
   computeSalePaymentFields,
-  MAX_DISCOUNT_PERCENT,
 } from "../src/lib/commerce";
 
-const product = (over: Partial<{ costPrice: number; sellingPrice: number; discountPrice: number; taxRate: number; _id: string; name: string; sku: string; currentStock: number }> = {}) => ({
+const product = (over: Partial<{ costPrice: number; sellingPrice: number; wholesalePrice: number; taxRate: number; _id: string; name: string; sku: string; currentStock: number }> = {}) => ({
   _id: "p1",
   name: "Widget",
   sku: "W-1",
   costPrice: 6,
   sellingPrice: 10,
-  discountPrice: 0,
+  wholesalePrice: 8,
   taxRate: 0,
   currentStock: 100,
   ...over,
@@ -162,25 +161,41 @@ describe("computeSaleTotals (server-authoritative pricing)", () => {
     expect(r.total).toBe(11);
   });
 
-  it("uses discountPrice when it is a cheaper promo price", () => {
+  it("retail mode always uses sellingPrice and never the wholesale price", () => {
     const r = computeSaleTotals(
       [{ productId: "p1", quantity: 1, unitDiscount: 0 }],
-      [product({ discountPrice: 8 })],
-      0,
-      "amount"
-    );
-    expect(r.items[0].sellingPrice).toBe(8);
-    expect(r.total).toBe(8);
-  });
-
-  it("ignores discountPrice when higher than sellingPrice", () => {
-    const r = computeSaleTotals(
-      [{ productId: "p1", quantity: 1, unitDiscount: 0 }],
-      [product({ discountPrice: 12 })],
+      [product({ sellingPrice: 10, wholesalePrice: 8 })],
       0,
       "amount"
     );
     expect(r.items[0].sellingPrice).toBe(10);
+    expect(r.items[0].pricingMode).toBe("retail");
+    expect(r.total).toBe(10);
+  });
+
+  it("wholesale mode uses the saved wholesale price", () => {
+    const r = computeSaleTotals(
+      [{ productId: "p1", quantity: 2, unitDiscount: 0 }],
+      [product({ sellingPrice: 10, wholesalePrice: 8 })],
+      0,
+      "amount",
+      "wholesale"
+    );
+    expect(r.items[0].sellingPrice).toBe(8);
+    expect(r.items[0].pricingMode).toBe("wholesale");
+    expect(r.total).toBe(16);
+  });
+
+  it("rejects wholesale mode when a product has no wholesale price", () => {
+    expect(() =>
+      computeSaleTotals(
+        [{ productId: "p1", quantity: 1, unitDiscount: 0 }],
+        [product({ wholesalePrice: 0 })],
+        0,
+        "amount",
+        "wholesale"
+      )
+    ).toThrow(/no wholesale price/i);
   });
 
   it("throws for unknown product (server must reject)", () => {

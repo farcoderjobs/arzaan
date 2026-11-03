@@ -1,4 +1,5 @@
 import { getCurrentUser, requireAuth } from "@/lib/auth";
+import { beginSyncActor } from "@/lib/sync/tracking";
 import { getUserPermissions, hasPermission as checkPermission, requirePermission as checkRequiredPermission } from "@/lib/authorization";
 import { PermissionName } from "@/lib/authorization";
 import { AuthUser } from "@/lib/auth";
@@ -19,8 +20,23 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 }
 
 export async function requireSessionUser(): Promise<SessionUser> {
+  // The actor MUST be established before the first `await`. An AsyncLocalStorage
+  // transition only affects the context that is executing right now: once this
+  // function suspends, the route handler resumes in *its own* context and would
+  // never see an actor entered later — every document written by the request
+  // would be queued for replication with no acting user. This function's prologue
+  // still runs inside the caller's frame, so entering a placeholder here and
+  // filling it in after the awaits gives the whole request (and the mongoose
+  // hooks that queue replication) one shared, mutable actor object.
+  const actor = beginSyncActor();
+
   const user = await requireAuth();
   const perms = await getUserPermissions(user.id, user.roleId);
+
+  // Fills the shared object — visible to everything that inherited the store.
+  actor.userId = user.id;
+  actor.branchId = user.branchId;
+
   return {
     ...user,
     permissions: Array.from(perms),

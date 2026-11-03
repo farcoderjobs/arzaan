@@ -27,9 +27,18 @@ type ProductRow = {
   name: string;
   sku: string;
   barcode?: string;
+  barcodes?: Array<{ code: string; label: string }>;
+  expirationDate?: string | null;
+  variantName?: string;
+  parentProductId?: string | null;
+  parentName?: string;
   description?: string;
   categoryId?: string | { _id: string; name: string } | null;
   brandId?: string | { _id: string; name: string } | null;
+  departmentId?: string | { _id: string; name: string } | null;
+  departmentName?: string;
+  purchaseSource?: "import" | "local" | null;
+
   costPrice?: number;
   sellingPrice?: number;
   discountPrice?: number;
@@ -62,8 +71,12 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     name: "",
     sku: "",
     barcode: "",
+    parentProductId: "",
+    variantName: "",
     categoryId: "",
     brandId: "",
+    departmentId: "",
+    purchaseSource: "" as "" | "import" | "local",
     purchasePrice: "",
     sellingPrice: "",
     wholesalePrice: "",
@@ -71,6 +84,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     discount: "",
     minimumStock: "",
     description: "",
+    expirationDate: "",
     status: "active" as ProductStatus,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -79,16 +93,37 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
   const [toggling, setToggling] = useState(false);
   const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
   const [brands, setBrands] = useState<{ _id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
+  const [parentProducts, setParentProducts] = useState<Array<{ _id: string; name: string; variantName?: string }>>([]);
   const [filterLoading, setFilterLoading] = useState(false);
+
+  // Barcode management (multiple barcodes per product, unique across variants)
+  const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
+  const [barcodeProduct, setBarcodeProduct] = useState<ProductRow | null>(null);
+  const [barcodeRows, setBarcodeRows] = useState<Array<{ code: string; label: string; primary: boolean }>>([]);
+  const [barcodeForm, setBarcodeForm] = useState({ code: "", label: "" });
+  const [barcodeEditing, setBarcodeEditing] = useState<string | null>(null);
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
+  const [barcodeError, setBarcodeError] = useState("");
 
   const loadFilters = useCallback(async () => {
     try {
-      const [catRes, brandRes] = await Promise.all([
+      const [catRes, brandRes, deptRes, prodRes] = await Promise.all([
         fetch("/api/categories"),
         fetch("/api/brands"),
+        fetch("/api/departments?all=1"),
+        fetch("/api/products?perPage=100&status=active"),
       ]);
       if (catRes.ok) setCategories(await catRes.json());
       if (brandRes.ok) setBrands(await brandRes.json());
+      if (deptRes.ok) {
+        const data = await deptRes.json();
+        setDepartments(data.departments ?? []);
+      }
+      if (prodRes.ok) {
+        const data = await prodRes.json();
+        setParentProducts(data.products ?? []);
+      }
     } catch {
       // ignore
     }
@@ -137,8 +172,12 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       name: "",
       sku: "",
       barcode: "",
+      parentProductId: "",
+      variantName: "",
       categoryId: "",
       brandId: "",
+      departmentId: "",
+      purchaseSource: "",
       purchasePrice: "",
       sellingPrice: "",
       wholesalePrice: "",
@@ -146,6 +185,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       discount: "",
       minimumStock: "",
       description: "",
+      expirationDate: "",
       status: "active",
     });
     setFormErrors({});
@@ -158,8 +198,15 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       name: product.name ?? "",
       sku: product.sku ?? "",
       barcode: product.barcode ?? "",
+      parentProductId: product.parentProductId ?? "",
+      variantName: product.variantName ?? "",
       categoryId: product.categoryId?.toString() ?? "",
       brandId: product.brandId?.toString() ?? "",
+      departmentId:
+        typeof product.departmentId === "string"
+          ? product.departmentId
+          : product.departmentId?._id ?? "",
+      purchaseSource: product.purchaseSource ?? "",
       purchasePrice: product.costPrice?.toString() ?? "",
       sellingPrice: product.sellingPrice?.toString() ?? "",
       wholesalePrice: product.discountPrice?.toString() ?? "",
@@ -167,6 +214,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       discount: product.discount?.toString() ?? "",
       minimumStock: product.reorderPoint?.toString() ?? "",
       description: product.description ?? "",
+      expirationDate: product.expirationDate ? product.expirationDate.slice(0, 10) : "",
       status: (product.status ?? "active") as ProductStatus,
     });
     setFormErrors({});
@@ -201,8 +249,12 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
         name: form.name.trim(),
         sku: form.sku.trim().toUpperCase(),
         barcode: form.barcode.trim().toUpperCase(),
+        parentProductId: form.parentProductId || null,
+        variantName: form.variantName.trim(),
         categoryId: form.categoryId || null,
         brandId: form.brandId || null,
+        departmentId: form.departmentId || null,
+        purchaseSource: form.purchaseSource || null,
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : 0,
         sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : 0,
         wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : 0,
@@ -210,6 +262,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
         discount: form.discount ? Number(form.discount) : 0,
         minimumStock: form.minimumStock ? Number(form.minimumStock) : 0,
         description: form.description.trim(),
+        expirationDate: form.expirationDate || null,
         status: form.status,
       };
       const res = await fetch("/api/products", {
@@ -277,6 +330,72 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       if (done) setToggleTarget(null);
     } finally {
       setToggling(false);
+    }
+  };
+
+  // ---------- Barcodes ----------
+  const loadBarcodes = useCallback(async (productId: string) => {
+    try {
+      const res = await fetch(`/api/products/barcodes?productId=${productId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setBarcodeRows(
+        ((data.barcodes ?? []) as Array<{ code: string; label: string; primary: boolean }>).map((b) => ({
+          code: b.code,
+          label: b.label ?? "",
+          primary: Boolean(b.primary),
+        }))
+      );
+    } catch {
+      // ignore — the modal simply shows what was loaded before
+    }
+  }, []);
+
+  const openBarcodes = async (product: ProductRow) => {
+    setBarcodeProduct(product);
+    setBarcodeForm({ code: "", label: "" });
+    setBarcodeEditing(null);
+    setBarcodeError("");
+    setBarcodeModalOpen(true);
+    await loadBarcodes(product._id);
+  };
+
+  const submitBarcode = async (
+    action: "add" | "update" | "remove" | "generate",
+    override?: { code?: string; label?: string }
+  ) => {
+    if (!barcodeProduct) return;
+    setBarcodeBusy(true);
+    setBarcodeError("");
+    try {
+      const code = (override?.code ?? barcodeForm.code).trim();
+      const label = (override?.label ?? barcodeForm.label).trim();
+      const payload: Record<string, unknown> = {
+        action,
+        productId: barcodeProduct._id,
+        code: action === "generate" ? undefined : code,
+        label,
+      };
+      if (action === "update" && barcodeEditing) payload.oldCode = barcodeEditing;
+      const res = await fetch("/api/products/barcodes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBarcodeError(apiErrorMessage(data, "Could not update barcodes"));
+        return;
+      }
+      success("Barcodes", data.message ?? "Saved");
+      setBarcodeForm({ code: "", label: "" });
+      setBarcodeEditing(null);
+      await loadBarcodes(barcodeProduct._id);
+      loadProducts();
+    } catch {
+      setBarcodeError("Could not update barcodes");
+    } finally {
+      setBarcodeBusy(false);
     }
   };
 
@@ -359,6 +478,18 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
               title="Edit"
             >
               <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {canCreate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                void openBarcodes(row);
+              }}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              title="Manage barcodes"
+            >
+              <span className="text-sm leading-none">🏷️</span>
             </button>
           )}
           {canCreate && (
@@ -488,6 +619,14 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                 <h3 className="text-lg font-semibold text-slate-900">{selected.name}</h3>
                 <p className="text-sm text-slate-500">{selected.sku}</p>
                 {selected.barcode && <p className="text-sm text-slate-500">Barcode: {selected.barcode}</p>}
+                {selected.variantName && (
+                  <p className="text-sm text-slate-500">Variant: {selected.variantName}</p>
+                )}
+                {(selected.barcodes ?? []).length > 0 && (
+                  <p className="text-sm text-slate-500">
+                    Other barcodes: {(selected.barcodes ?? []).map((b) => b.code).join(", ")}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -507,8 +646,11 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                 <div className="mt-2 space-y-1 text-sm">
                   <p className="text-slate-600">Category: <span className="font-medium text-slate-900">{categoryName(selected.categoryId)}</span></p>
                   <p className="text-slate-600">Brand: <span className="font-medium text-slate-900">{brandName(selected.brandId)}</span></p>
+                  <p className="text-slate-600">Department: <span className="font-medium text-slate-900">{selected.departmentName || "Shop"}</span></p>
+                  <p className="text-slate-600">Purchase source: <span className="font-medium text-slate-900">{selected.purchaseSource === "import" ? "Import (China)" : selected.purchaseSource === "local" ? "Local" : "Not set"}</span></p>
                   <p className="text-slate-600">Status: {statusBadge(selected.status ?? "inactive")}</p>
                   <p className="text-slate-600">Min stock: <span className="font-medium text-slate-900">{selected.reorderPoint ?? 0}</span></p>
+                  <p className="text-slate-600">Expiration: <span className="font-medium text-slate-900">{selected.expirationDate ? new Date(selected.expirationDate).toLocaleDateString() : "None"}</span></p>
                 </div>
               </div>
             </div>
@@ -560,12 +702,57 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                label="Variant of"
+                hint="Leave empty for a standalone product. A variant keeps its own SKU, barcodes, price and stock."
+              >
+                <Select
+                  value={form.parentProductId}
+                  onChange={(v) => setForm({ ...form, parentProductId: v })}
+                  options={parentProducts
+                    .filter((p) => p._id !== selected?._id)
+                    .map((p) => ({ value: p._id, label: p.variantName ? `${p.name} — ${p.variantName}` : p.name }))}
+                  placeholder="Standalone product"
+                />
+              </FormField>
+              <FormField label="Variant name" hint="e.g. Vanilla 500g, Large, 12-pack">
+                <Input
+                  value={form.variantName}
+                  onChange={(e) => setForm({ ...form, variantName: e.target.value })}
+                  placeholder="Variant name (optional)"
+                />
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Purchase Source" hint="Origin of this product's stock; used in reports when a sold batch has none.">
+                <Select
+                  value={form.purchaseSource}
+                  onChange={(v) => setForm({ ...form, purchaseSource: v as "" | "import" | "local" })}
+                  options={[
+                    { value: "", label: "Not set" },
+                    { value: "local", label: "Local" },
+                    { value: "import", label: "Import (China)" },
+                  ]}
+                />
+              </FormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
               <FormField label="Brand">
                 <Select
                   value={form.brandId}
                   onChange={(v) => setForm({ ...form, brandId: v })}
                   options={brands.map((b) => ({ value: b._id, label: b.name }))}
                   placeholder="Select brand"
+                />
+              </FormField>
+              <FormField label="Department" hint="Sales of this product are reported under this department.">
+                <Select
+                  value={form.departmentId}
+                  onChange={(v) => setForm({ ...form, departmentId: v })}
+                  options={departments.map((d) => ({ value: d._id, label: d.name }))}
+                  placeholder="Shop (no department)"
                 />
               </FormField>
               <FormField label="Minimum Stock">
@@ -636,6 +823,19 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
               </FormField>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                label="Expiration Date"
+                hint="Optional. Purchase batches can each carry their own expiry date."
+              >
+                <Input
+                  type="date"
+                  value={form.expirationDate}
+                  onChange={(e) => setForm({ ...form, expirationDate: e.target.value })}
+                />
+              </FormField>
+            </div>
+
             <FormField label="Description">
               <Textarea
                 value={form.description}
@@ -657,6 +857,107 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
             </FormField>
           </div>
         )}
+      </Modal>
+
+      {/* Barcodes — multiple unique codes per product/variant */}
+      <Modal
+        open={barcodeModalOpen}
+        onClose={() => setBarcodeModalOpen(false)}
+        title={`Barcodes — ${barcodeProduct?.name ?? ""}`}
+        size="md"
+        footer={<Button variant="secondary" onClick={() => setBarcodeModalOpen(false)}>Close</Button>}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Each barcode identifies one sellable product or variant and must be unique across the whole catalog.
+            Generated codes are internal labels — they are not GS1 registrations.
+          </p>
+
+          {barcodeRows.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+              This product has no barcode yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {barcodeRows.map((row) => (
+                <li key={row.code} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm text-slate-900">{row.code}</p>
+                    <p className="text-xs text-slate-400">
+                      {row.label || "No label"}{row.primary ? " · Primary" : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setBarcodeEditing(row.code);
+                        setBarcodeForm({ code: row.code, label: row.label });
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500"
+                      loading={barcodeBusy}
+                      onClick={() => void submitBarcode("remove", { code: row.code, label: row.label })}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label={barcodeEditing ? "Edit barcode" : "New barcode"}>
+              <Input
+                value={barcodeForm.code}
+                onChange={(e) => setBarcodeForm({ ...barcodeForm, code: e.target.value.toUpperCase() })}
+                placeholder="e.g. 2001234567890"
+              />
+            </FormField>
+            <FormField label="Label" hint="Optional hint, e.g. flavour or packaging">
+              <Input
+                value={barcodeForm.label}
+                onChange={(e) => setBarcodeForm({ ...barcodeForm, label: e.target.value })}
+                placeholder="e.g. Strawberry"
+              />
+            </FormField>
+          </div>
+
+          {barcodeError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{barcodeError}</p>}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              loading={barcodeBusy}
+              disabled={!barcodeForm.code.trim()}
+              onClick={() => void submitBarcode(barcodeEditing ? "update" : "add")}
+            >
+              {barcodeEditing ? "Save barcode" : "Add barcode"}
+            </Button>
+            {barcodeEditing && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBarcodeEditing(null);
+                  setBarcodeForm({ code: "", label: "" });
+                }}
+              >
+                Cancel edit
+              </Button>
+            )}
+            {barcodeRows.length === 0 && (
+              <Button variant="secondary" loading={barcodeBusy} onClick={() => void submitBarcode("generate")}>
+                Generate barcode
+              </Button>
+            )}
+          </div>
+        </div>
       </Modal>
 
       <ConfirmDialog

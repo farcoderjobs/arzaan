@@ -12,16 +12,21 @@ import { getStoreSettings } from "@/lib/settings";
 import { recordAuditLog } from "@/lib/audit";
 
 const createSchema = z.object({
+  clientTransactionId: z.string().min(8).max(100).optional(),
   saleId: z.string().min(1, "Original sale is required"),
   items: z
     .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().min(1).max(10000),
-      })
+      z
+        .object({
+          lineId: z.string().min(1).optional(),
+          productId: z.string().min(1).optional(),
+          quantity: z.number().int().min(1).max(10000),
+          restock: z.boolean().default(true),
+        })
+        .refine((i) => Boolean(i.lineId || i.productId), { message: "Each item needs a line or product" })
     )
     .min(1, "Select at least one item to return"),
-  refundMethod: z.enum(["cash", "original", "credit"]).default("cash"),
+  refundMethod: z.enum(["cash", "original", "credit", "card", "transfer"]).default("cash"),
   reason: z.string().min(1, "Return reason is required").max(300),
   note: z.string().max(300).default(""),
 });
@@ -58,6 +63,7 @@ export async function POST(req: NextRequest) {
       reason: data.reason,
       note: data.note,
       requireApproval,
+      clientTransactionId: data.clientTransactionId ?? null,
     });
 
     await recordAuditLog({
@@ -65,7 +71,14 @@ export async function POST(req: NextRequest) {
       action: "sale_return.create",
       entityType: "SaleReturn",
       entityId: result.id,
-      newValue: { returnNumber: result.returnNumber, total: result.total, status: result.status, refundMethod: data.refundMethod },
+      newValue: {
+        returnNumber: result.returnNumber,
+        total: result.total,
+        status: result.status,
+        refundMethod: data.refundMethod,
+        bonusReversed: result.bonusReversed,
+        clientTransactionId: data.clientTransactionId ?? null,
+      },
       note: `Return for sale ${data.saleId}: ${data.reason}`,
     });
 

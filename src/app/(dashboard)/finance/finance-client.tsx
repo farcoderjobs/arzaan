@@ -55,6 +55,9 @@ const TX_STYLES: Record<string, string> = {
   income: "bg-emerald-100 text-emerald-700",
   adjustment: "bg-purple-100 text-purple-700",
   closing: "bg-slate-100 text-slate-600",
+  purchase: "bg-rose-100 text-rose-700",
+  payment_in: "bg-teal-100 text-teal-700",
+  payment_out: "bg-rose-100 text-rose-700",
 };
 
 type Tab = "expenses" | "customer-payments" | "supplier-payments" | "cash-transactions";
@@ -813,7 +816,7 @@ function CashTransactionsSection() {
             value={filters.type}
             onChange={(v) => { setFilters({ ...filters, type: v }); setPage(1); }}
             placeholder="All types"
-            options={["opening", "sale", "refund", "expense", "income", "adjustment", "closing"].map((t) => ({ value: t, label: t[0].toUpperCase() + t.slice(1) }))}
+            options={["opening", "sale", "refund", "expense", "income", "adjustment", "purchase", "payment_in", "payment_out", "closing"].map((t) => ({ value: t, label: t.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) }))}
           />
           <Input type="date" value={filters.from} onChange={(e) => { setFilters({ ...filters, from: e.target.value }); setPage(1); }} />
           <Input type="date" value={filters.to} onChange={(e) => { setFilters({ ...filters, to: e.target.value }); setPage(1); }} />

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
-import { StoreProduct } from "@/models";
+import { Category, StoreProduct } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -26,11 +26,33 @@ const saveSchema = z.object({
   compareAtPrice: z.number().min(0).default(0),
   accent: z.enum(ACCENTS).default("indigo"),
   imageUrl: z.string().trim().max(500).default(""),
+  /** Free-text fallback kept for legacy rows (no categoryId). */
   category: z.string().trim().max(80).default("General"),
+  /** Real category from the MongoDB category collection (preferred). */
+  categoryId: z.string().trim().nullable().optional(),
   stock: z.number().int().min(0, "Stock cannot be negative").default(0),
   featured: z.boolean().default(false),
   status: z.enum(["active", "inactive"]).default("active"),
 });
+
+/** Resolves the selected category document (must be active) or null. */
+async function resolveCategory(
+  categoryId: string | null | undefined
+): Promise<{ error: NextResponse } | { _id: mongoose.Types.ObjectId | null; name: string | null }> {
+  if (!categoryId) return { _id: null, name: null };
+  if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    return { error: NextResponse.json(badRequest("Invalid category"), { status: 400 }) };
+  }
+  const category = await Category.findById(categoryId);
+  if (!category || category.status !== "active") {
+    return {
+      error: NextResponse.json(badRequest("Selected category was not found or is inactive"), {
+        status: 400,
+      }),
+    };
+  }
+  return { _id: category._id, name: category.name };
+}
 
 function slugify(name: string): string {
   return name
@@ -126,8 +148,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const resolved = await resolveCategory(data.categoryId);
+    if ("error" in resolved) return resolved.error;
+
     const slug = await uniqueSlug(slugify(data.name));
-    const product = await StoreProduct.create({ ...data, slug });
+    const product = await StoreProduct.create({
+      ...data,
+      slug,
+      categoryId: resolved._id,
+      category: resolved.name ?? (data.category || "General"),
+    });
 
     await recordAuditLog({
       user,
@@ -220,6 +250,9 @@ export async function PATCH(req: NextRequest) {
       status: product.status,
     };
 
+    const resolved = await resolveCategory(data.categoryId);
+    if ("error" in resolved) return resolved.error;
+
     product.name = data.name;
     // Keep the slug stable once created (links/orders reference it), unless the
     // product was never meaningfully named.
@@ -229,7 +262,10 @@ export async function PATCH(req: NextRequest) {
     product.compareAtPrice = data.compareAtPrice;
     product.accent = data.accent;
     product.imageUrl = data.imageUrl;
-    product.category = data.category || "General";
+    product.categoryId = resolved._id;
+    // The stored name always mirrors the category document, so the storefront
+    // never shows a name that differs from the category collection.
+    product.category = resolved.name ?? (data.category || "General");
     product.stock = data.stock;
     product.featured = data.featured;
     product.status = data.status;

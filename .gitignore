@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local MongoDB data directories used by test/scratch runs
+/.tmp-mongo/
+/.tmp-mongo-rs/
+
+# test output
+test-results/
+playwright-report/
+blob-report/
+
+# dev / QA logs (build, e2e, integration, monitor output)
+*.log
+
+# scratch dev script
+/monitor-tmp.mjs

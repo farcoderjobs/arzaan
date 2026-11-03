@@ -145,6 +145,7 @@ export async function getRegisterSummary(registerId: string) {
     expenses: number;
     income: number;
     adjustments: number;
+    net: number;
     counted: number | null;
   }>([
     { $match: { registerId: objectId } },
@@ -158,6 +159,9 @@ export async function getRegisterSummary(registerId: string) {
         income: { $sum: { $cond: [{ $eq: ["$type", "income"] }, "$amount", 0] } },
         adjustments: { $sum: { $cond: [{ $eq: ["$type", "adjustment"] }, "$amount", 0] } },
         closing: { $sum: { $cond: [{ $eq: ["$type", "closing"] }, "$amount", 0] } },
+        // Every movement except the counted-cash row, including employee
+        // purchase payments and supplier payments made from the drawer.
+        net: { $sum: { $cond: [{ $eq: ["$type", "closing"] }, 0, "$amount"] } },
       },
     },
     {
@@ -169,6 +173,7 @@ export async function getRegisterSummary(registerId: string) {
         expenses: 1,
         income: 1,
         adjustments: 1,
+        net: 1,
         counted: {
           $cond: [{ $gt: ["$closing", 0] }, "$closing", null],
         },
@@ -176,10 +181,10 @@ export async function getRegisterSummary(registerId: string) {
     },
   ]);
 
-  const r = results[0] ?? { opening: 0, sales: 0, refunds: 0, expenses: 0, income: 0, adjustments: 0, counted: null };
-  // Refunds and expenses are stored as signed (negative) amounts, so the expected
-  // cash is simply the sum of every movement in the session.
-  const expected = round2(r.opening + r.sales + r.income + r.refunds + r.expenses + r.adjustments);
+  const r = results[0] ?? { opening: 0, sales: 0, refunds: 0, expenses: 0, income: 0, adjustments: 0, net: 0, counted: null };
+  // Refunds, expenses and supplier payments are stored as signed (negative)
+  // amounts, so the expected cash is the sum of every non-closing movement.
+  const expected = round2(r.net);
   return {
     openingCash: round2(r.opening),
     cashSales: round2(r.sales),

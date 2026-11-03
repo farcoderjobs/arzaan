@@ -12,6 +12,8 @@ interface CustomerDetailClientProps {
   customerId: string;
   canPayment: boolean;
   canViewSales: boolean;
+  canEdit: boolean;
+  canAdjustBonus?: boolean;
 }
 
 interface CustomerData {
@@ -22,7 +24,20 @@ interface CustomerData {
   address: string;
   notes: string;
   status: string;
+  wholesaleEligible?: boolean;
+  bonusPercent?: number;
+  bonusBalance?: number;
   createdAt: string;
+}
+
+interface BonusEntry {
+  _id: string;
+  type: "EARN" | "REDEEM" | "REVERSAL" | "ADJUSTMENT";
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  createdAt: string;
+  userId: { _id: string; name: string } | null;
 }
 
 interface LedgerEntry {
@@ -54,10 +69,13 @@ const TYPE_LABELS: Record<string, { label: string; className: string }> = {
   ADJUSTMENT: { label: "Adjustment", className: "bg-amber-100 text-amber-700" },
 };
 
-export function CustomerDetailClient({ customerId, canPayment, canViewSales }: CustomerDetailClientProps) {
+export function CustomerDetailClient({ customerId, canPayment, canViewSales, canEdit, canAdjustBonus }: CustomerDetailClientProps) {
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<CustomerData | null>(null);
   const [balance, setBalance] = useState(0);
+  const [bonusBalance, setBonusBalance] = useState(0);
+  const [bonusLedger, setBonusLedger] = useState<BonusEntry[]>([]);
+  const [bonusSummary, setBonusSummary] = useState({ earned: 0, redeemed: 0, reversed: 0, adjusted: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [ledgerTotal, setLedgerTotal] = useState(0);
   const [ledgerPage, setLedgerPage] = useState(1);
@@ -68,6 +86,15 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
   const [payForm, setPayForm] = useState({ amount: "", method: "cash", reference: "", note: "", allowOverpay: false });
   const [paying, setPaying] = useState(false);
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ bonusPercent: "0", wholesaleEligible: false });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Manual reward-credit adjustment (permission `bonus.adjust`, reason required).
+  const [bonusAdjustOpen, setBonusAdjustOpen] = useState(false);
+  const [bonusAdjust, setBonusAdjust] = useState({ amount: "", reason: "" });
+  const [bonusAdjusting, setBonusAdjusting] = useState(false);
+
   const load = useCallback(async () => {
 
     try {
@@ -76,6 +103,9 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
       const data = await res.json();
       setCustomer(data.customer);
       setBalance(data.balance ?? 0);
+      setBonusBalance(data.bonusBalance ?? 0);
+      setBonusLedger(data.bonusLedger?.entries ?? []);
+      setBonusSummary(data.bonusLedger?.summary ?? { earned: 0, redeemed: 0, reversed: 0, adjusted: 0 });
       setLedger(data.ledger?.entries ?? []);
       setLedgerTotal(data.ledger?.total ?? 0);
       setRecentSales(data.recentSales ?? []);
@@ -130,6 +160,91 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
     }
   };
 
+  const submitBonusAdjust = async () => {
+    const amount = Number(bonusAdjust.amount);
+    if (!bonusAdjust.amount || !Number.isFinite(amount) || amount === 0) {
+      error("Error", "Enter a non-zero amount (use a minus sign to remove credit)");
+      return;
+    }
+    if (bonusAdjust.reason.trim().length < 3) {
+      error("Error", "A reason is required for every adjustment");
+      return;
+    }
+    setBonusAdjusting(true);
+    try {
+      const res = await fetch(`/api/customers/${customerId}/bonus`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          reason: bonusAdjust.reason.trim(),
+          idempotencyKey: `${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        error("Error", data?.error?.message ?? "Failed to adjust reward credit");
+        return;
+      }
+      success("Reward credit adjusted", `New balance: ${money(data.data?.balanceAfter ?? 0)}`);
+      setBonusAdjustOpen(false);
+      setBonusAdjust({ amount: "", reason: "" });
+      load();
+    } catch {
+      error("Error", "Failed to adjust reward credit");
+    } finally {
+      setBonusAdjusting(false);
+    }
+  };
+
+  const openEdit = () => {
+    if (!customer) return;
+    setEditForm({
+      bonusPercent: String(customer.bonusPercent ?? 0),
+      wholesaleEligible: customer.wholesaleEligible === true,
+    });
+    setEditOpen(true);
+  };
+
+  const saveSettings = async () => {
+    if (!customer) return;
+    const percent = Number(editForm.bonusPercent);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      error("Error", "Bonus percentage must be between 0 and 100");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: customer._id,
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          address: customer.address,
+          notes: customer.notes,
+          status: customer.status,
+          bonusPercent: percent,
+          wholesaleEligible: editForm.wholesaleEligible,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        error("Error", data?.error?.message ?? "Failed to update customer");
+        return;
+      }
+      success("Customer updated", "Reward and wholesale settings saved");
+      setEditOpen(false);
+      load();
+    } catch {
+      error("Error", "Failed to update customer");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   if (loading && !customer) {
     return <div className="mx-auto max-w-6xl"><div className="h-40 animate-pulse rounded-xl bg-slate-100" /></div>;
   }
@@ -155,15 +270,20 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
             {[customer.phone, customer.email].filter(Boolean).join(" · ") || "No contact info"}
           </p>
         </div>
-        {canPayment && customer.status === "active" && (
-          <Button onClick={() => { setPayForm({ amount: balance > 0 ? balance.toFixed(2) : "", method: "cash", reference: "", note: "", allowOverpay: false }); setPayOpen(true); }}>
-            Record Payment
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {canEdit && (
+            <Button variant="secondary" onClick={openEdit}>Reward & pricing settings</Button>
+          )}
+          {canPayment && customer.status === "active" && (
+            <Button onClick={() => { setPayForm({ amount: balance > 0 ? balance.toFixed(2) : "", method: "cash", reference: "", note: "", allowOverpay: false }); setPayOpen(true); }}>
+              Record Payment
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className={cn("rounded-xl border p-5", balance > 0 ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white")}>
           <p className="text-sm font-medium text-slate-500">Outstanding Balance</p>
           <p className={cn("mt-1 text-2xl font-semibold", balance > 0 ? "text-amber-700" : "text-slate-900")}>
@@ -176,10 +296,21 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
           <p className="mt-1 text-2xl font-semibold text-slate-900">{money(lifetime.total)}</p>
           <p className="mt-1 text-xs text-slate-400">{lifetime.count} completed sale{lifetime.count !== 1 ? "s" : ""}</p>
         </div>
+        <div className={cn("rounded-xl border p-5", bonusBalance > 0 ? "border-green-200 bg-green-50" : "border-slate-200 bg-white")}>
+          <p className="text-sm font-medium text-slate-500">Reward Credit</p>
+          <p className={cn("mt-1 text-2xl font-semibold", bonusBalance > 0 ? "text-green-700" : "text-slate-900")}>
+            {money(bonusBalance)}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Earns {customer.bonusPercent ?? 0}% · separate from cash and debt
+          </p>
+        </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <p className="text-sm font-medium text-slate-500">Status</p>
           <p className="mt-1 text-2xl font-semibold capitalize text-slate-900">{customer.status}</p>
-          <p className="mt-1 text-xs text-slate-400">Customer since {new Date(customer.createdAt).toLocaleDateString()}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {customer.wholesaleEligible ? "Wholesale eligible" : "Retail pricing only"}
+          </p>
         </div>
       </div>
 
@@ -199,6 +330,78 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
           )}
         </div>
       ) : null}
+
+      {/* Bonus ledger */}
+      <div className="mt-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-900">Reward Credit Ledger</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs text-slate-500">
+              Earned {money(bonusSummary.earned)} · Redeemed {money(bonusSummary.redeemed)} · Reversed {money(bonusSummary.reversed)}
+            </p>
+            {canAdjustBonus && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setBonusAdjust({ amount: "", reason: "" });
+                  setBonusAdjustOpen(true);
+                }}
+              >
+                Adjust reward credit
+              </Button>
+            )}
+          </div>
+        </div>
+        <Table
+          columns={[
+            {
+              key: "createdAt",
+              header: "Date",
+              render: (row: BonusEntry) => new Date(row.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+            },
+            {
+              key: "type",
+              header: "Type",
+              render: (row: BonusEntry) => {
+                const styles: Record<string, string> = {
+                  EARN: "bg-green-100 text-green-700",
+                  REDEEM: "bg-blue-100 text-blue-700",
+                  REVERSAL: "bg-red-100 text-red-700",
+                  ADJUSTMENT: "bg-amber-100 text-amber-700",
+                };
+                return <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", styles[row.type])}>{row.type}</span>;
+              },
+            },
+            {
+              key: "description",
+              header: "Description",
+              render: (row: BonusEntry) => row.description,
+            },
+            {
+              key: "amount",
+              header: "Bonus",
+              className: "text-right",
+              render: (row: BonusEntry) => (
+                <span className={cn("font-medium", row.amount > 0 ? "text-green-600" : "text-red-600")}>
+                  {row.amount > 0 ? "+" : ""}{money(row.amount)}
+                </span>
+              ),
+            },
+            {
+              key: "balanceAfter",
+              header: "Balance",
+              className: "text-right",
+              render: (row: BonusEntry) => <span className="font-medium">{money(row.balanceAfter)}</span>,
+            },
+            { key: "user", header: "By", render: (row: BonusEntry) => row.userId?.name ?? "—" },
+          ]}
+          data={bonusLedger}
+          keyExtractor={(row) => row._id}
+          loading={loading}
+          empty={<EmptyState label="No reward activity" description="Bonus is earned on completed sales for customers with a bonus percentage." />}
+        />
+      </div>
 
       {/* Ledger */}
       <div className="mt-8">
@@ -306,6 +509,75 @@ export function CustomerDetailClient({ customerId, canPayment, canViewSales }: C
           empty={<EmptyState label="No purchases yet" description="Completed sales for this customer will appear here." />}
         />
       </div>
+
+      {/* Reward & wholesale settings */}
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Reward & pricing settings"
+        description="Only administrators with customer update permission can change these values."
+        size="sm"
+        footer={[
+          <Button key="cancel" variant="secondary" onClick={() => setEditOpen(false)}>Cancel</Button>,
+          <Button key="save" loading={editSaving} onClick={saveSettings}>Save</Button>,
+        ]}
+      >
+        <div className="space-y-4">
+          <FormField label="Bonus percentage" hint="Percentage of eligible merchandise earned as reward credit, e.g. 1 for 1%">
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={editForm.bonusPercent}
+              onChange={(e) => setEditForm({ ...editForm, bonusPercent: e.target.value })}
+            />
+          </FormField>
+          <Checkbox
+            label="Wholesale pricing eligible"
+            checked={editForm.wholesaleEligible}
+            onChange={(e) => setEditForm({ ...editForm, wholesaleEligible: e.target.checked })}
+          />
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            Reward credit is stored separately from cash, revenue and customer debt. Returns reverse earned credit proportionally.
+          </p>
+        </div>
+      </Modal>
+
+      {/* Reward-credit adjustment (manual, reason mandatory, audited) */}
+      <Modal
+        open={bonusAdjustOpen}
+        onClose={() => setBonusAdjustOpen(false)}
+        title="Adjust reward credit"
+        description={`Current balance: ${money(bonusBalance)}`}
+        size="sm"
+        footer={[
+          <Button key="cancel" variant="secondary" onClick={() => setBonusAdjustOpen(false)}>Cancel</Button>,
+          <Button key="save" loading={bonusAdjusting} onClick={submitBonusAdjust}>Apply adjustment</Button>,
+        ]}
+      >
+        <div className="space-y-4">
+          <FormField label="Amount" required hint="Positive adds credit, negative removes it">
+            <Input
+              type="number"
+              step="0.01"
+              value={bonusAdjust.amount}
+              onChange={(e) => setBonusAdjust({ ...bonusAdjust, amount: e.target.value })}
+              placeholder="0.00"
+            />
+          </FormField>
+          <FormField label="Reason" required>
+            <Input
+              value={bonusAdjust.reason}
+              onChange={(e) => setBonusAdjust({ ...bonusAdjust, reason: e.target.value })}
+              placeholder="Why is this balance changing?"
+            />
+          </FormField>
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            Adjustments are append-only ledger entries: history is never edited, and the audit log keeps your name.
+          </p>
+        </div>
+      </Modal>
 
       {/* Payment modal */}
       <Modal

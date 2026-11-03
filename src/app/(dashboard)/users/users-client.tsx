@@ -13,6 +13,8 @@ interface UsersClientProps {
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  /** Assigning an employee to the department they head. */
+  canAssignDepartment: boolean;
 }
 
 interface UserRow {
@@ -25,6 +27,9 @@ interface UserRow {
   roleName: string | null;
   branchId: string | null;
   branchName: string | null;
+  /** Department this employee heads (null = none). */
+  departmentId: string | null;
+  departmentName: string | null;
   lastLoginAt: string | Date | null;
   createdAt: string | Date;
 }
@@ -41,6 +46,14 @@ interface BranchOption {
   status: string;
 }
 
+interface DepartmentOption {
+  _id: string;
+  name: string;
+  branchId: string | null;
+  employeeId: string | null;
+  employeeName: string | null;
+}
+
 interface ActivityData {
   user: { id: string; name: string; email: string };
   salesLast30d: number;
@@ -54,10 +67,11 @@ const EMPTY_FORM = {
   password: "",
   roleId: "",
   branchId: "",
+  departmentId: "",
   status: "active" as "active" | "inactive",
 };
 
-export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProps) {
+export function UsersClient({ canCreate, canUpdate, canDelete, canAssignDepartment }: UsersClientProps) {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -68,6 +82,7 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
 
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit" | null>(null);
@@ -114,7 +129,11 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
   useEffect(() => {
     (async () => {
       try {
-        const [rolesRes, branchesRes] = await Promise.all([fetch("/api/roles"), fetch("/api/branches")]);
+        const [rolesRes, branchesRes, departmentsRes] = await Promise.all([
+          fetch("/api/roles"),
+          fetch("/api/branches"),
+          fetch("/api/departments?all=0"),
+        ]);
         if (rolesRes.ok) {
           const rd = await rolesRes.json();
           setRoles(rd.roles ?? []);
@@ -122,6 +141,10 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
         if (branchesRes.ok) {
           const bd = await branchesRes.json();
           setBranches(bd.branches ?? []);
+        }
+        if (departmentsRes.ok) {
+          const dd = await departmentsRes.json();
+          setDepartments(dd.departments ?? []);
         }
       } catch {
         // filters degrade gracefully
@@ -145,6 +168,7 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
       password: "",
       roleId: u.roleId ?? "",
       branchId: u.branchId ?? "",
+      departmentId: u.departmentId ?? "",
       status: u.status === "inactive" ? "inactive" : "active",
     });
     setErrors({});
@@ -178,6 +202,7 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
               password: form.password,
               roleId: form.roleId,
               branchId: form.branchId || null,
+              departmentId: form.departmentId || null,
             }
           : {
               action: "update",
@@ -188,6 +213,7 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
                 status: form.status,
                 roleId: form.roleId || undefined,
                 branchId: form.branchId || null,
+                departmentId: form.departmentId || undefined,
               },
             };
       const res = await fetch("/api/users", {
@@ -315,6 +341,11 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
     },
     { key: "role", header: "Role", render: (u: UserRow) => u.roleName ?? "—" },
     { key: "branch", header: "Branch", render: (u: UserRow) => u.branchName ?? "All branches" },
+    {
+      key: "department",
+      header: "Department",
+      render: (u: UserRow) => u.departmentName ?? "—",
+    },
     {
       key: "status",
       header: "Status",
@@ -521,6 +552,24 @@ export function UsersClient({ canCreate, canUpdate, canDelete }: UsersClientProp
               />
             </FormField>
           </div>
+          {canAssignDepartment && (
+            <FormField
+              label="Department"
+              hint="The department this employee heads. Departments are created on the Departments page."
+            >
+              <Select
+                value={form.departmentId}
+                onChange={(v) => setForm({ ...form, departmentId: v })}
+                options={[
+                  { value: "", label: form.departmentId ? "No department (unchanged)" : "No department" },
+                  ...departments.map((d) => ({
+                    value: d._id,
+                    label: `${d.name}${d.employeeName ? ` · headed by ${d.employeeName}` : ""}`,
+                  })),
+                ]}
+              />
+            </FormField>
+          )}
           {mode === "edit" && (
             <FormField label="Status">
               <Select

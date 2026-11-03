@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
 import { notFound } from "@/lib/api";
 import { getCustomerBalance, getCustomerLedger } from "@/lib/customer-ledger";
+import { getCustomerBonusBalance, getCustomerBonusBalanceRaw, getCustomerBonusLedger } from "@/lib/bonus";
 
 export async function GET(
   req: NextRequest,
@@ -28,7 +29,7 @@ export async function GET(
       return NextResponse.json(notFound("Customer not found"), { status: 404 });
     }
 
-    const [balance, ledger, sales, salesAgg] = await Promise.all([
+    const [balance, ledger, sales, salesAgg, bonusBalance, bonusBalanceRaw, bonusLedger] = await Promise.all([
       getCustomerBalance(id),
       getCustomerLedger(id, { page: ledgerPage, perPage: 20, type: ledgerType || undefined }),
       Sale.find({ customerId: id, status: "completed" })
@@ -40,12 +41,18 @@ export async function GET(
         { $match: { customerId: new (await import("mongoose")).Types.ObjectId(id), status: "completed" } },
         { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } },
       ]),
+      getCustomerBonusBalance(id),
+      getCustomerBonusBalanceRaw(id),
+      getCustomerBonusLedger(id, { page: 1, perPage: 20 }),
     ]);
 
     return NextResponse.json({
       customer,
       balance,
       ledger,
+      bonusBalance,
+      bonusBalanceRaw,
+      bonusLedger,
       recentSales: sales,
       lifetimeSales: {
         total: salesAgg[0]?.total ?? 0,

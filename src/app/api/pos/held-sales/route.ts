@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import { Sale, Customer } from "@/models";
+import { Sale } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -68,15 +68,31 @@ export async function POST(req: NextRequest) {
     const cart = {
       customerId: held.customerId ? (held.customerId as unknown as { _id: string })._id.toString() : null,
       customerName: held.customerId ? (held.customerId as unknown as { name: string }).name : null,
-      items: held.items.map((i) => ({
-        productId: i.productId.toString(),
-        name: i.name,
-        sku: i.sku,
-        quantity: i.quantity,
-        unitDiscount: i.discount,
-      })),
+      items: held.items
+        .filter((i) => i.itemType !== "direct" && i.productId)
+        .map((i) => ({
+          productId: i.productId!.toString(),
+          name: i.name,
+          sku: i.sku,
+          quantity: i.quantity,
+          unitDiscount: i.discount,
+        })),
+      // Direct-sale lines are restored as-is (they have no product/stock).
+      directItems: held.items
+        .filter((i) => i.itemType === "direct")
+        .map((i) => ({
+          description: i.name,
+          quantity: i.quantity,
+          unitPrice: i.sellingPrice,
+          unitCost: i.costPrice,
+          taxRate:
+            i.sellingPrice * i.quantity > 0
+              ? Math.round((i.tax / (i.sellingPrice * i.quantity)) * 10000) / 100
+              : 0,
+        })),
       discount: held.discount,
       discountType: held.discountType,
+      pricingMode: held.pricingMode ?? "retail",
       note: held.note,
     };
 

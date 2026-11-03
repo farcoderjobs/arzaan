@@ -79,11 +79,29 @@ export async function GET(req: NextRequest) {
       avgTicket: summaryAgg[0]?.count ? round2((summaryAgg[0].revenue ?? 0) / summaryAgg[0].count) : 0,
     };
 
-    // Payment method split (unwind payments)
+    // Payment method split (unwind payments). The cash line is net of change,
+    // so it equals the money the drawer actually kept — the same amount the
+    // Finance > Cash Transactions report shows for sale movements.
     const paymentSplit = await Sale.aggregate<{ _id: string; total: number }>([
       { $match: baseMatch },
       { $unwind: "$payments" },
-      { $group: { _id: "$payments.method", total: { $sum: "$payments.amount" } } },
+      {
+        $group: {
+          _id: { method: "$payments.method", sale: "$_id" },
+          total: { $sum: "$payments.amount" },
+          change: { $first: { $ifNull: ["$changeAmount", 0] } },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.method",
+          total: {
+            $sum: {
+              $cond: [{ $eq: ["$_id.method", "cash"] }, { $subtract: ["$total", "$change"] }, "$total"],
+            },
+          },
+        },
+      },
       { $sort: { total: -1 } },
     ]);
 

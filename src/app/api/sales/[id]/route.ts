@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import { Sale, SaleReturn, Customer, User } from "@/models";
+import { Sale, SaleReturn } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission, hasAnyPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
-import { notFound, success, badRequest, forbidden } from "@/lib/api";
-import { recordAuditLog, requestMeta, diffForAudit } from "@/lib/audit";
+import { notFound, forbidden } from "@/lib/api";
+import { recordAuditLog, requestMeta } from "@/lib/audit";
 import { assertBranchAccess, BranchAccessError } from "@/lib/branch-access";
 import mongoose from "mongoose";
 
@@ -63,7 +63,9 @@ export async function GET(
         branchAddress: sale.branchId?.address ?? "",
         branchPhone: sale.branchId?.phone ?? "",
         items: sale.items.map((item) => ({
-          productId: item.productId.toString(),
+          productId: item.productId?.toString() ?? null,
+          itemType: item.itemType ?? "inventory",
+          pricingMode: item.pricingMode ?? "retail",
           name: item.name,
           sku: item.sku,
           quantity: item.quantity,
@@ -79,7 +81,10 @@ export async function GET(
         returnNumber: r.returnNumber,
         status: r.status,
         items: r.items.map((i) => ({
-          productId: i.productId.toString(),
+          productId: i.productId?.toString() ?? "",
+          itemType: i.itemType ?? "inventory",
+          restock: i.restock !== false,
+          pricingMode: i.pricingMode ?? "retail",
           name: i.name,
           sku: i.sku,
           quantity: i.quantity,
@@ -87,6 +92,10 @@ export async function GET(
           subtotal: i.subtotal,
         })),
         total: r.total,
+        replacementTotal: r.replacementTotal ?? 0,
+        netAmount: r.netAmount ?? -r.total,
+        bonusReversed: r.bonusReversed ?? 0,
+        exchangeSaleId: r.exchangeSaleId?.toString() ?? null,
         refundMethod: r.refundMethod,
         reason: r.reason,
         userName: (r.userId as unknown as { name: string })?.name ?? "—",

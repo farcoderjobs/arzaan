@@ -19,6 +19,14 @@ const PORT = process.env.QA_PORT || "3210";
 const BASE_URL = process.env.QA_BASE_URL || `http://localhost:${PORT}`;
 const TEST_DB = process.env.TEST_MONGODB_DB_NAME || `${process.env.MONGODB_DB_NAME || "pos"}-test`;
 
+/**
+ * The offline-sync spec runs a "center" stub on this port and points the QA
+ * server's SYNC_ONLINE_URL at it, so a test can take the center down and bring
+ * it back without restarting the app server. The node credentials must match
+ * the SyncNode that scripts/seed-test-db.ts seeds into the test database.
+ */
+const CENTER_STUB_PORT = process.env.QA_CENTER_STUB_PORT || "3999";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 120_000,
@@ -43,6 +51,17 @@ export default defineConfig({
     env: {
       QA_PORT: PORT,
       TEST_MONGODB_DB_NAME: TEST_DB,
+      // Shop-node role: every write is queued locally and pushed to the stub
+      // center (see tests/e2e/offline-sync.spec.ts). The interval is pushed out
+      // of the way so tests — not the background loop — decide when sync runs.
+      SYNC_ENABLED: "true",
+      SYNC_INTERVAL_MS: "3600000",
+      SYNC_NODE_ID: process.env.QA_SYNC_NODE_ID || "qa-e2e-node",
+      // Must be ≥16 characters (env schema) and identical to the key hashed by
+      // scripts/seed-test-db.ts, or the node cannot authenticate to the stub.
+      SYNC_NODE_KEY: process.env.QA_SYNC_NODE_KEY || "qa-e2e-node-key-01",
+      SYNC_NODE_NAME: "QA E2E node",
+      SYNC_ONLINE_URL: `http://127.0.0.1:${CENTER_STUB_PORT}`,
     },
   },
 });

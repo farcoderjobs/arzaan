@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
     const soldPipeline: mongoose.PipelineStage[] = [
       { $match: baseMatch },
       { $unwind: "$items" },
+      // Direct-sale lines have no product record — they belong to sales/profit
+      // reports, not to the per-product report.
+      { $match: { "items.itemType": { $ne: "direct" } } },
       ...(categoryId
         ? [
             {

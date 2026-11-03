@@ -3,6 +3,12 @@ import { connectDB } from "@/lib/mongodb";
 import { StoreProduct } from "@/models";
 import { getStoreSettings } from "@/lib/settings";
 import { Storefront, StoreProductView } from "@/components/store/storefront";
+import {
+  categoryKeyFor,
+  findCategoryKeyBySlug,
+  resolveStorefrontCategories,
+  type StorefrontCategory,
+} from "@/lib/store-categories";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
@@ -21,11 +27,20 @@ export async function generateMetadata(): Promise<Metadata> {
 // The storefront reads live product/stock data — never prerender it at build time.
 export const dynamic = "force-dynamic";
 
-export default async function StoreHomePage() {
+export default async function StoreHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const requestedCategory = Array.isArray(params.category) ? params.category[0] : params.category;
+
   let products: StoreProductView[] = [];
+  let categories: StorefrontCategory[] = [];
   let storeName = "Online Store";
   let currency = "AFN";
   let storePhone = "";
+  let loadError = false;
 
   try {
     await connectDB();
@@ -36,7 +51,7 @@ export default async function StoreHomePage() {
 
     const docs = await StoreProduct.find({ status: "active" })
       .sort({ featured: -1, createdAt: -1 })
-      .select("name slug description price compareAtPrice accent imageUrl category stock featured")
+      .select("name slug description price compareAtPrice accent imageUrl category categoryId stock featured")
       .lean();
 
     products = docs.map((p) => ({
@@ -49,16 +64,29 @@ export default async function StoreHomePage() {
       accent: p.accent,
       imageUrl: p.imageUrl,
       category: p.category,
+      categoryKey: categoryKeyFor(p),
       stock: p.stock,
       inStock: p.stock > 0,
       featured: p.featured,
     }));
+
+    // Active, published categories only — straight from the category collection.
+    categories = await resolveStorefrontCategories(docs);
   } catch (error) {
     // DB down — render an empty, friendly storefront rather than a crash page.
     console.error("Store home load failed:", error);
+    loadError = true;
   }
 
-  const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean))).sort();
-
-  return <Storefront products={products} categories={categories} storeName={storeName} currency={currency} storePhone={storePhone} />;
+  return (
+    <Storefront
+      products={products}
+      categories={categories}
+      initialCategory={findCategoryKeyBySlug(categories, requestedCategory) ?? "all"}
+      storeName={storeName}
+      currency={currency}
+      storePhone={storePhone}
+      loadError={loadError}
+    />
+  );
 }

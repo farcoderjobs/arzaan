@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
-import { User, Role, Branch, Sale } from "@/models";
+import { User, Role, Branch, Sale, Department } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -27,6 +27,7 @@ const createSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").max(128),
   roleId: objectIdField,
   branchId: z.string().nullable().optional(),
+  departmentId: objectIdField.nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -36,6 +37,7 @@ const updateSchema = z.object({
   status: z.enum(["active", "inactive"]).optional(),
   roleId: objectIdField.optional(),
   branchId: z.string().nullable().optional(),
+  departmentId: objectIdField.nullable().optional(),
 });
 
 const passwordSchema = z.object({
@@ -59,7 +61,12 @@ function fieldErrors(err: z.ZodError): Record<string, string> {
   return out;
 }
 
-function toRow(u: Record<string, unknown>, roleName: string | null, branchName: string | null) {
+function toRow(
+  u: Record<string, unknown>,
+  roleName: string | null,
+  branchName: string | null,
+  department: { _id: string; name: string } | null
+) {
   return {
     _id: (u._id as mongoose.Types.ObjectId).toString(),
     name: u.name as string,
@@ -70,9 +77,63 @@ function toRow(u: Record<string, unknown>, roleName: string | null, branchName: 
     roleName,
     branchId: u.branchId ? (u.branchId as mongoose.Types.ObjectId).toString() : null,
     branchName,
+    departmentId: department?._id ?? null,
+    departmentName: department?.name ?? null,
     lastLoginAt: u.lastLoginAt ?? null,
     createdAt: u.createdAt,
   };
+}
+
+/**
+ * Checks that a department can receive this shop's employee. Returns a human
+ * error message, or null when the assignment is valid.
+ */
+async function checkDepartment(departmentId: string, branchId: string | null): Promise<string | null> {
+  if (!mongoose.Types.ObjectId.isValid(departmentId)) return "Invalid department";
+  const department = await Department.findById(departmentId).select("name branchId status").lean();
+  if (!department) return "Selected department does not exist";
+  if (department.status !== "active") return "Selected department is inactive";
+  if (!branchId) return "Set the employee's branch before assigning a department";
+  if (String(department.branchId) !== branchId) {
+    return "The employee and the department must belong to the same shop";
+  }
+  return null;
+}
+
+/**
+ * Makes the employee the head of the selected department.
+ *
+ * The relationship lives on the Department document (one active department per
+ * employee and shop), so assigning from the Users screen updates that row
+ * instead of creating a second, conflicting copy on the user.
+ */
+async function assignDepartment(
+  userId: string,
+  branchId: string | null,
+  departmentId: string
+): Promise<string | null> {
+  const invalid = await checkDepartment(departmentId, branchId);
+  if (invalid) return invalid;
+
+  const department = await Department.findById(departmentId);
+  if (!department) return "Selected department does not exist";
+  if (String(department.employeeId) === userId) return null;
+
+  const current = await Department.findOne({
+    employeeId: new mongoose.Types.ObjectId(userId),
+    branchId: new mongoose.Types.ObjectId(branchId as string),
+    status: "active",
+    _id: { $ne: department._id },
+  })
+    .select("name")
+    .lean();
+  if (current) {
+    return `This employee already heads the department "${current.name}" — change it on the Departments page`;
+  }
+
+  department.employeeId = new mongoose.Types.ObjectId(userId);
+  await department.save();
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -109,12 +170,28 @@ export async function GET(req: NextRequest) {
         .lean() as Promise<Array<Record<string, unknown>>>,
     ]);
 
+    // A department owns the employee relationship (one active department per
+    // employee per shop), so read it from there instead of duplicating the id
+    // on the user document.
+    const departments = users.length
+      ? await Department.find({
+          employeeId: { $in: users.map((u) => u._id as mongoose.Types.ObjectId) },
+          status: "active",
+        })
+          .select("name employeeId")
+          .lean()
+      : [];
+    const departmentByEmployee = new Map(
+      departments.map((d) => [String(d.employeeId), { _id: String(d._id), name: d.name }])
+    );
+
     return NextResponse.json({
       users: users.map((u) =>
         toRow(
           u,
           (u.roleId as { name: string } | null)?.name ?? null,
-          (u.branchId as { name: string } | null)?.name ?? null
+          (u.branchId as { name: string } | null)?.name ?? null,
+          departmentByEmployee.get(String(u._id)) ?? null
         )
       ),
       total,
@@ -162,6 +239,16 @@ export async function POST(req: NextRequest) {
         assertBranchAccess(user, branch._id);
       }
 
+      // Validate the department before creating anything, so a rejected
+      // assignment cannot leave a half-created user behind.
+      if (data.departmentId) {
+        const departmentError = await checkDepartment(
+          data.departmentId,
+          data.branchId ?? null
+        );
+        if (departmentError) return NextResponse.json(badRequest(departmentError), { status: 400 });
+      }
+
       const created = await User.create({
         name: data.name.trim(),
         email: data.email.toLowerCase().trim(),
@@ -171,6 +258,19 @@ export async function POST(req: NextRequest) {
         branchId: data.branchId ? new mongoose.Types.ObjectId(data.branchId) : null,
         status: "active",
       });
+
+      if (data.departmentId) {
+        const departmentError = await assignDepartment(
+          created._id.toString(),
+          created.branchId ? created.branchId.toString() : null,
+          data.departmentId
+        );
+        if (departmentError) {
+          // Roll the user back: the request failed as a whole.
+          await User.deleteOne({ _id: created._id });
+          return NextResponse.json(badRequest(departmentError), { status: 400 });
+        }
+      }
 
       await recordAuditLog({
         user,
@@ -244,6 +344,17 @@ export async function POST(req: NextRequest) {
       if (data.name !== undefined) target.name = data.name.trim();
       if (data.phone !== undefined) target.phone = data.phone.trim();
       if (data.status !== undefined) target.status = data.status;
+
+      // Assigning a department updates the Department row (it owns the head
+      // employee), so it must see the employee's final branch.
+      if (data.departmentId) {
+        const departmentError = await assignDepartment(
+          target._id.toString(),
+          target.branchId ? target.branchId.toString() : null,
+          data.departmentId
+        );
+        if (departmentError) return NextResponse.json(badRequest(departmentError), { status: 400 });
+      }
 
       await target.save();
 

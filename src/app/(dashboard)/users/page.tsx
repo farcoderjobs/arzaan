@@ -13,5 +13,15 @@ export default async function UsersPage() {
     hasPermission(user, PERMISSIONS.users.update),
     hasPermission(user, PERMISSIONS.users.delete),
   ]);
-  return <UsersClient canCreate={canCreate} canUpdate={canUpdate} canDelete={canDelete} />;
+  // A department is headed by an employee; assigning one from this screen is
+  // part of managing that employee, so it follows the users permissions.
+  const canAssignDepartment = canCreate || canUpdate;
+  return (
+    <UsersClient
+      canCreate={canCreate}
+      canUpdate={canUpdate}
+      canDelete={canDelete}
+      canAssignDepartment={canAssignDepartment}
+    />
+  );
 }

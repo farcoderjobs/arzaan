@@ -143,8 +143,13 @@ Workflow:
 from transactions), record **payments**.
 
 **Purchases (`/purchases`)** — stock entering the store.
-1. **New Purchase**: pick supplier, add product lines (qty, purchase price,
-   discount, tax), choose payment method, enter **paid amount**.
+1. **New Purchase**: pick supplier, choose the **purchase source**
+   (**Local** or **Import (China)**), add product lines (qty, purchase price,
+   discount, tax), choose payment method, enter **paid amount**. Import
+   purchases are only accepted from users holding `purchases.import`
+   (managers); the server refuses them for everyone else, even if the option
+   is sent directly. The source follows the stock into batches, transfers and
+   sale lines, so reports can split Local vs Import.
 2. **Complete**: purchase is saved, **stock enters inventory**
    (PURCHASE_IN movements at purchase price), supplier transaction recorded,
    paid amount creates a payment; unpaid part becomes supplier debt.
@@ -202,7 +207,7 @@ Every financial record stores amount, type, method, reference, user, branch,
 timestamp. Normal users cannot physically delete financial records.
 
 ### 4.10 Reports (`/reports`)
-Nine reports, each with **day / week / month / custom range** filters,
+Reports, each with **day / week / month / custom range** filters,
 pagination, and **CSV export** where useful:
 - **Sales** — by day/cashier/customer/payment method/category (net of refunds)
 - **Products** — qty sold, revenue, COGS, gross profit; best / slow / never sold
@@ -216,6 +221,14 @@ pagination, and **CSV export** where useful:
   (COGS uses the **cost price stored on each historical sale item**, so old
   sales stay correct when prices change)
 - **Online Store** — storefront orders, revenue, best sellers, order status
+- **Departments** — gross sales, discounts, returns, net sales, COGS and profit
+  grouped by department / employee / product / day, filtered by shop,
+  department, employee and purchase source. Legacy sales with no department
+  are shown as **Unassigned**, never guessed. Returns are subtracted, never
+  counted as sales, and exchange replacements keep the original transaction's
+  attribution.
+- **Stock by location** — on-hand units per warehouse/shop, stock value, units
+  in transit, low- and out-of-stock rows per location.
 
 > **Refunds everywhere:** approved returns reduce revenue and COGS in the
 > Sales, Products and Profit reports exactly like the Dashboard KPIs — both
@@ -277,8 +290,60 @@ Tabs:
 - **POS** — allow negative stock, max cashier discount %, require customer
   for credit, auto-print receipt, refund approval, default payment method.
 - **Inventory** — low-stock threshold, allow negative inventory, valuation.
-- **Branches** — add/edit branches (name, address, phone, status). Users
-  assigned to a branch only see that branch's data; Super Admin sees all.
+- **Branches** — add/edit branches (name, address, phone, status, **type**:
+  shop or warehouse). Users assigned to a branch only see that branch's data;
+  Super Admin sees all. A warehouse holds stock but cannot be used as a
+  selling register.
+
+### 4.14 Departments (`/departments`)
+A department belongs to one shop and is headed by one employee.
+- **Create / edit**: name, optional code, shop, head employee, note.
+- **Rules**: one department name per shop; an employee can head only one
+  **active** department per shop; the employee must be active and belong to
+  the same shop.
+- **Deactivate** instead of deleting: past sales keep pointing at it. Its
+  sales are still reported under the department; new sales by that employee
+  are unassigned unless they head another department.
+- Cashiers can view departments; only managers/admins with `departments.*`
+  permissions can create, edit or deactivate.
+
+### 4.15 Attendance & payroll (`/attendance`, `/payroll`)
+**Attendance** — present by default on every scheduled working day.
+- Pick month + shop + employee; the day list shows *present* unless marked.
+- **Absent** / **Leave** marks an exception; **Present** clears it. Every mark,
+  correction and clear writes an audit row (who, when, before → after).
+- Weekly rest day defaults to Friday; approved leave and rest/holiday days are
+  never counted as absences.
+
+**Payroll** — monthly salary per employee, entered by an admin/manager.
+- Daily salary = **monthly salary ÷ calendar days in that month** (so 28-, 30-
+  and 31-day months stay consistent).
+- The first **7** absence days in a month are free; each further absence day
+  costs one day's salary.
+- **Generate** builds a draft (re-generating a draft replaces it). **Finalize**
+  freezes the month — regeneration is refused afterwards.
+- **Pay** records full or partial payments; overpaying or paying the same month
+  twice is rejected at the database level. Finalized history is never silently
+  overwritten.
+- The page also shows totals: gross salary, deductions, net payable, paid and
+  outstanding.
+
+### 4.16 Warehouse & stock transfers (`/transfers`)
+- A **warehouse** is a branch of type *warehouse* (Settings → Branches). Stock
+  is tracked per location, and the POS only offers stock at the cashier's own
+  shop.
+- **New transfer**: choose source and destination, add product lines, save as
+  draft.
+- **Dispatch** moves stock out of the source (TRANSFER_OUT). It validates the
+  source balance, takes the earliest-expiring batch and copies its batch
+  number, expiry and Import/Local origin.
+- **Receive** (full or partial) moves the received units into the destination
+  (TRANSFER_IN). The unreceived remainder stays **in transit**; add a
+  discrepancy note for short/damaged units.
+- **Cancel** is only possible before dispatch; dispatched stock must be
+  received. Total stock only changes by what is actually received, never just
+  because it moved.
+- Moving an Import batch keeps it Import; moving Local keeps it Local.
 
 ---
 

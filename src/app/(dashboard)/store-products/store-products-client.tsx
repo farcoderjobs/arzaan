@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, FormField, Input, Select, Textarea, Checkbox, Modal, ConfirmDialog, Pagination, SearchInput, Table, EmptyState, PageHeader } from "@/components/ui";
 import { money } from "@/lib/currency";
 import { success, error as toastError, warning } from "@/utils/toast";
+import { StoreCategoryField } from "@/components/store/category-field";
 import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/utils/classname";
 
@@ -18,6 +19,7 @@ interface StoreProductRow {
   accent: string;
   imageUrl: string;
   category: string;
+  categoryId?: string | null;
   stock: number;
   featured: boolean;
   status: "active" | "inactive";
@@ -41,6 +43,7 @@ const EMPTY_FORM = {
   accent: "indigo",
   imageUrl: "",
   category: "General",
+  categoryId: "",
   stock: 0,
   featured: false,
   status: "active" as "active" | "inactive",
@@ -110,6 +113,7 @@ export function StoreProductsClient() {
       accent: row.accent ?? "indigo",
       imageUrl: row.imageUrl ?? "",
       category: row.category ?? "General",
+      categoryId: row.categoryId ?? "",
       stock: row.stock ?? 0,
       featured: row.featured ?? false,
       status: row.status,
@@ -134,7 +138,14 @@ export function StoreProductsClient() {
     }
     setSaving(true);
     try {
-      const payload = { ...form, id: formId, price: Number(form.price), compareAtPrice: Number(form.compareAtPrice), stock: Number(form.stock) };
+      const payload = {
+        ...form,
+        id: formId,
+        categoryId: form.categoryId || null,
+        price: Number(form.price),
+        compareAtPrice: Number(form.compareAtPrice),
+        stock: Number(form.stock),
+      };
       const res = await fetch("/api/store/admin", {
         method: formId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -389,9 +400,12 @@ export function StoreProductsClient() {
             <Input type="number" min={0} step="0.01" value={form.compareAtPrice} onChange={(e) => setForm({ ...form, compareAtPrice: Number(e.target.value) || 0 })} />
           </FormField>
 
-          <FormField label="Category" hint="Free text — used for storefront filters">
-            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Beverages" />
-          </FormField>
+          <StoreCategoryField
+            categoryId={form.categoryId}
+            category={form.category}
+            error={fieldErrors.categoryId}
+            onChange={({ categoryId, category }) => setForm({ ...form, categoryId, category })}
+          />
 
           <FormField label="Stock" required hint="Units available to online buyers">
             <Input type="number" min={0} step={1} value={form.stock} onChange={(e) => setForm({ ...form, stock: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />

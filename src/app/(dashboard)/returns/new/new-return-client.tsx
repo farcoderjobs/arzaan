@@ -8,9 +8,11 @@ import { success, error, warning } from "@/utils/toast";
 import { cn } from "@/utils/classname";
 import { money } from "@/lib/currency";
 import { Search } from "@/components/ui/icons";
+import { REFUND_REASONS, OTHER_REASON } from "@/lib/refund-reasons";
 
 interface SaleItem {
-  productId: string;
+  productId: string | null;
+  itemType?: "inventory" | "direct";
   name: string;
   sku: string;
   quantity: number;
@@ -34,21 +36,6 @@ interface ExistingReturn {
   items: Array<{ productId: string; quantity: number }>;
 }
 
-/**
- * Common refund reasons, prefilled so the cashier picks instead of typing.
- * "other" reveals a free-text box for anything not covered.
- */
-const REFUND_REASONS = [
-  { value: "customer_returned", label: "Customer returned it — changed their mind" },
-  { value: "customer_returned_wrong", label: "Customer returned it — wrong item, size or color" },
-  { value: "defective", label: "Defective or damaged product" },
-  { value: "not_as_described", label: "Not as described" },
-  { value: "expired", label: "Expired or near expiry" },
-  { value: "duplicate", label: "Duplicate purchase" },
-  { value: "other", label: "Other reason…" },
-];
-
-const OTHER_REASON = "other";
 
 export function NewReturnClient() {
   const router = useRouter();
@@ -78,7 +65,8 @@ export function NewReturnClient() {
         invoiceNumber: data.sale.invoiceNumber,
         createdAt: data.sale.createdAt,
         customerName: data.sale.customerId?.name ?? null,
-        items: data.sale.items,
+        // Direct-sale lines carry no stock, so they cannot be returned to the shelf.
+        items: (data.sale.items as SaleItem[]).filter((i) => i.itemType !== "direct" && i.productId),
         total: data.sale.total,
       });
       setExistingReturns(data.returns ?? []);
@@ -120,7 +108,8 @@ export function NewReturnClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetSaleId]);
 
-  const returnedByProduct = (productId: string) =>
+  const returnedByProduct = (productId: string | null) =>
+    !productId ? 0 :
     existingReturns
       .filter((r) => r.status === "approved" || r.status === "pending")
       .flatMap((r) => r.items)
@@ -130,6 +119,7 @@ export function NewReturnClient() {
   const returnable = (item: SaleItem) => Math.max(0, item.quantity - returnedByProduct(item.productId));
 
   const refundTotal = (sale?.items ?? []).reduce((sum, item) => {
+    if (!item.productId) return sum;
     const qty = quantities[item.productId] ?? 0;
     if (qty <= 0 || !item.quantity) return sum;
     return sum + (item.subtotal * qty) / item.quantity;
@@ -230,8 +220,9 @@ export function NewReturnClient() {
               <tbody className="divide-y divide-slate-100">
                 {sale.items.map((item) => {
                   const max = returnable(item);
+                  const itemId = item.productId ?? "";
                   return (
-                    <tr key={item.productId}>
+                    <tr key={itemId}>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{item.name}</p>
                         <p className="text-xs text-slate-400">{item.sku} · {money(item.sellingPrice)}</p>
@@ -248,10 +239,10 @@ export function NewReturnClient() {
                             type="number"
                             min={0}
                             max={max}
-                            value={quantities[item.productId] ?? ""}
+                            value={quantities[itemId] ?? ""}
                             onChange={(e) => {
                               const v = Math.min(Math.max(0, Number(e.target.value) || 0), max);
-                              setQuantities((prev) => ({ ...prev, [item.productId]: v }));
+                              setQuantities((prev) => ({ ...prev, [itemId]: v }));
                             }}
                             className="w-20 rounded border border-slate-300 px-2 py-1.5 text-right focus:border-blue-500 focus:outline-none"
                             placeholder={`0–${max}`}

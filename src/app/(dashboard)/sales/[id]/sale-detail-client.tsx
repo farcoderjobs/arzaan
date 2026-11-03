@@ -16,7 +16,9 @@ interface SaleDetailClientProps {
 }
 
 interface SaleItem {
-  productId: string;
+  productId: string | null;
+  itemType?: "inventory" | "direct";
+  pricingMode?: "retail" | "wholesale";
   name: string;
   sku: string;
   quantity: number;
@@ -37,8 +39,12 @@ interface SaleReturnRow {
   _id: string;
   returnNumber: string;
   status: string;
-  items: Array<{ productId: string; name: string; sku: string; quantity: number; sellingPrice: number; subtotal: number }>;
+  items: Array<{ productId: string; itemType?: string; restock?: boolean; pricingMode?: string; name: string; sku: string; quantity: number; sellingPrice: number; subtotal: number }>;
   total: number;
+  replacementTotal?: number;
+  netAmount?: number;
+  bonusReversed?: number;
+  exchangeSaleId?: string | null;
   refundMethod: string;
   reason: string;
   userName: string;
@@ -60,6 +66,9 @@ interface SaleData {
   changeAmount: number;
   payments: SalePayment[];
   paymentMethod: string | null;
+  pricingMode?: "retail" | "wholesale";
+  bonusEarned?: number;
+  bonusRedeemed?: number;
   note: string;
   customerId: { _id: string; name: string; phone?: string } | null;
   cashierName: string;
@@ -96,12 +105,14 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
 
   const printReceipt = () => window.print();
 
-  const returnedQtyByProduct = (productId: string) =>
-    returns
-      .filter((r) => r.status === "approved" || r.status === "pending")
-      .flatMap((r) => r.items)
-      .filter((i) => i.productId === productId)
-      .reduce((s, i) => s + i.quantity, 0);
+  const returnedQtyByProduct = (productId: string | null) =>
+    !productId
+      ? 0
+      : returns
+          .filter((r) => r.status === "approved" || r.status === "pending")
+          .flatMap((r) => r.items)
+          .filter((i) => i.productId === productId)
+          .reduce((s, i) => s + i.quantity, 0);
 
   if (loading && !sale) {
     return <div className="mx-auto max-w-4xl"><div className="h-64 animate-pulse rounded-xl bg-slate-100" /></div>;
@@ -131,7 +142,7 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
           <div className="flex gap-2">
             <Button variant="secondary" onClick={load} loading={loading}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
             <Button variant="secondary" onClick={printReceipt}><Printer className="mr-2 h-4 w-4" />Print Receipt</Button>
-            {canRefund && sale.status === "completed" && (
+            {canRefund && sale.status === "completed" && sale.items.some((i) => i.itemType !== "direct") && (
               <Link href={`/returns/new?sale=${sale._id}`}>
                 <Button>Process Return</Button>
               </Link>
@@ -158,13 +169,25 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sale.items.map((item) => {
+                {sale.items.map((item, index) => {
                   const returned = returnedQtyByProduct(item.productId);
                   return (
-                    <tr key={item.productId}>
+                    <tr key={`${item.productId ?? "direct"}-${index}`}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{item.name}</p>
-                        <p className="text-xs text-slate-400">{item.sku}</p>
+                        <p className="font-medium text-slate-900">
+                          {item.name}
+                          {item.itemType === "direct" && (
+                            <span className="ms-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-700">
+                              Direct sale
+                            </span>
+                          )}
+                          {item.pricingMode === "wholesale" && (
+                            <span className="ms-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">
+                              Wholesale
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-slate-400">{item.itemType === "direct" ? "No inventory movement" : item.sku}</p>
                       </td>
                       <td className="px-4 py-3 text-right">{item.quantity}</td>
                       <td className="px-4 py-3 text-right">{money(item.sellingPrice)}</td>
@@ -187,6 +210,15 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
                 <div className="flex justify-between text-slate-500"><span>Tax</span><span>{money(sale.tax)}</span></div>
                 <div className="flex justify-between text-base font-bold text-slate-900"><span>Total</span><span>{money(sale.total)}</span></div>
                 <div className="flex justify-between text-slate-500"><span>Paid</span><span>{money(sale.paidAmount)}</span></div>
+                {sale.pricingMode === "wholesale" && (
+                  <div className="flex justify-between font-medium text-amber-700"><span>Pricing</span><span>Wholesale</span></div>
+                )}
+                {(sale.bonusRedeemed ?? 0) > 0 && (
+                  <div className="flex justify-between text-blue-700"><span>Reward credit used</span><span>−{money(sale.bonusRedeemed ?? 0)}</span></div>
+                )}
+                {(sale.bonusEarned ?? 0) > 0 && (
+                  <div className="flex justify-between text-green-700"><span>Reward credit earned</span><span>+{money(sale.bonusEarned ?? 0)}</span></div>
+                )}
                 {sale.changeAmount > 0 && (
                   <div className="flex justify-between font-medium text-green-700"><span>Change given</span><span>{money(sale.changeAmount)}</span></div>
                 )}
@@ -243,10 +275,16 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
                     </div>
                     <p className="mt-2 text-xs text-slate-500">
                       Refund method: <span className="capitalize">{r.refundMethod}</span> · Reason: {r.reason || "—"}
+                      {(r.replacementTotal ?? 0) > 0 ? ` · Exchange replacement ${money(r.replacementTotal ?? 0)}` : ""}
+                      {typeof r.netAmount === "number" ? ` · Net ${r.netAmount > 0 ? "collected" : "refunded"} ${money(Math.abs(r.netAmount))}` : ""}
+                      {(r.bonusReversed ?? 0) > 0 ? ` · Bonus reversed ${money(r.bonusReversed ?? 0)}` : ""}
                     </p>
                     <ul className="mt-2 text-xs text-slate-600">
                       {r.items.map((i, idx) => (
-                        <li key={idx}>{i.quantity} × {i.name} @ {money(i.sellingPrice)}</li>
+                        <li key={idx}>
+                          {i.quantity} × {i.name} @ {money(i.sellingPrice)}
+                          {i.itemType === "direct" ? " (direct, no restock)" : i.restock === false ? " (not restocked)" : ""}
+                        </li>
                       ))}
                     </ul>
                     <Link href={`/returns/${r._id}`} className="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline">
@@ -307,10 +345,11 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
             </tr>
           </thead>
           <tbody>
-            {sale.items.map((item) => (
-              <tr key={item.productId} className="align-top">
+            {sale.items.map((item, index) => (
+              <tr key={`${item.productId ?? "direct"}-${index}`} className="align-top">
                 <td>
                   {item.name}
+                  {item.itemType === "direct" && <span className="block text-[10px] font-semibold">direct sale</span>}
                   {item.discount > 0 && <span className="block text-[10px]">disc −{money(item.discount)}</span>}
                   {item.tax > 0 && <span className="block text-[10px]">tax {money(item.tax)}</span>}
                 </td>

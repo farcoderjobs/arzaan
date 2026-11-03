@@ -17,7 +17,7 @@ import { parseReportRange, parsePage, escapeRegex, csvResponse } from "@/lib/rep
  * Stock is derived from inventory movements (the source of truth), never a stored field.
  */
 
-const STOCK_IN = ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN"];
+const STOCK_IN = ["PURCHASE_IN", "CUSTOMER_RETURN_IN", "ADJUSTMENT_IN", "STOCK_COUNT_IN", "TRANSFER_IN"];
 
 const stockExpr = null; // stock is computed per product after unwinding movements
 
@@ -239,11 +239,11 @@ export async function GET(req: NextRequest) {
     if (searchParams.get("format") === "csv") {
       const header =
         view === "valuation"
-          ? [["Product", "SKU", "Stock", "Cost Price", "Stock Value", "Retail Value"]]
-          : [["Product", "SKU", "Stock", "Reorder Point", "Cost Price", "Selling Price"]];
+          ? [["Product", "SKU", "Stock", "Cost Price", "Unit Selling Price", "Stock Value", "Retail Value"]]
+          : [["Product", "SKU", "Stock", "Reorder Point", "Cost Price", "Unit Selling Price"]];
       const csvRows = [...header];
       for (const r of rows) {
-        if (view === "valuation") csvRows.push([r.name, r.sku, r.stock, r.costPrice, r.value, r.retailValue]);
+        if (view === "valuation") csvRows.push([r.name, r.sku, r.stock, r.costPrice, r.sellingPrice, r.value, r.retailValue]);
         else csvRows.push([r.name, r.sku, r.stock, r.reorderPoint, r.costPrice, r.sellingPrice]);
       }
       return csvResponse(`inventory-${view}-${new Date().toISOString().slice(0, 10)}.csv`, csvRows);

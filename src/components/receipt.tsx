@@ -13,6 +13,10 @@ export interface ReceiptItem {
   discount: number;
   tax: number;
   total: number;
+  /** Direct-sale line: bought in the market, no inventory movement. */
+  direct?: boolean;
+  /** Catalog tier charged for the line. */
+  pricingMode?: "retail" | "wholesale";
 }
 
 export interface ReceiptData {
@@ -32,6 +36,20 @@ export interface ReceiptData {
   paidAmount: number;
   changeAmount: number;
   payments: Array<{ method: string; amount: number }>;
+  /** Whole-sale pricing tier. */
+  pricingMode?: "retail" | "wholesale";
+  /** Reward credit earned and redeemed (kept separate from cash/revenue). */
+  bonusEarned?: number;
+  bonusRedeemed?: number;
+  /** Available reward balance after this sale, when known. */
+  bonusBalance?: number;
+  /** Staff purchase: benefit granted and what stays on the employee account. */
+  employeePurchase?: {
+    employeeName: string;
+    benefitPercent: number;
+    benefitAmount: number;
+    outstanding: number;
+  } | null;
   /** True when the sale was taken offline and is pending synchronization. */
   offline?: boolean;
 }
@@ -68,6 +86,18 @@ export function PrintableReceipt({ data }: { data: ReceiptData }) {
           <span>Customer:</span>
           <span>{data.customerName ?? "Walk-in"}</span>
         </div>
+        {data.pricingMode === "wholesale" && (
+          <div className="flex justify-between font-bold">
+            <span>Pricing:</span>
+            <span>WHOLESALE</span>
+          </div>
+        )}
+        {data.employeePurchase && (
+          <div className="flex justify-between font-bold">
+            <span>Employee:</span>
+            <span>{data.employeePurchase.employeeName}</span>
+          </div>
+        )}
       </div>
 
       <table className="mt-2 w-full text-[11px]">
@@ -84,6 +114,8 @@ export function PrintableReceipt({ data }: { data: ReceiptData }) {
             <tr key={`${item.sku}-${i}`} className="align-top">
               <td>
                 {item.name}
+                {item.direct && <span className="block text-[10px] font-semibold">direct sale</span>}
+                {item.pricingMode === "wholesale" && <span className="block text-[10px] font-semibold">wholesale price</span>}
                 {item.discount > 0 && <span className="block text-[10px]">disc −{money(item.discount)}</span>}
                 {item.tax > 0 && <span className="block text-[10px]">tax {money(item.tax)}</span>}
               </td>
@@ -127,6 +159,40 @@ export function PrintableReceipt({ data }: { data: ReceiptData }) {
             <span>CHANGE</span>
             <span>{money(data.changeAmount)}</span>
           </div>
+        )}
+        {(data.bonusRedeemed ?? 0) > 0 && (
+          <div className="flex justify-between">
+            <span>Reward credit used</span>
+            <span>−{money(data.bonusRedeemed ?? 0)}</span>
+          </div>
+        )}
+        {(data.bonusEarned ?? 0) > 0 && (
+          <div className="flex justify-between">
+            <span>Reward credit earned</span>
+            <span>+{money(data.bonusEarned ?? 0)}</span>
+          </div>
+        )}
+        {data.bonusBalance !== undefined && (
+          <div className="flex justify-between text-[10px]">
+            <span>Reward balance</span>
+            <span>{money(data.bonusBalance)}</span>
+          </div>
+        )}
+        {data.employeePurchase && (
+          <>
+            {data.employeePurchase.benefitAmount > 0 && (
+              <div className="flex justify-between">
+                <span>Employee benefit ({data.employeePurchase.benefitPercent}%)</span>
+                <span>−{money(data.employeePurchase.benefitAmount)}</span>
+              </div>
+            )}
+            {data.employeePurchase.outstanding > 0 && (
+              <div className="flex justify-between font-bold">
+                <span>On employee account</span>
+                <span>{money(data.employeePurchase.outstanding)}</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

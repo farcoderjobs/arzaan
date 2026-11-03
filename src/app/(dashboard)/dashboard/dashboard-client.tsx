@@ -40,6 +40,27 @@ interface ChartPoint {
   profit: number | null;
 }
 
+interface ExpiryAlertItem {
+  productId: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  batchNumber: string;
+  quantity: number;
+  expirationDate: string;
+  daysRemaining: number;
+  status: "expired" | "expiring";
+}
+
+interface ExpiryAlerts {
+  windowDays: number;
+  expiredCount: number;
+  expiringCount: number;
+  expiredQty: number;
+  expiringQty: number;
+  items: ExpiryAlertItem[];
+}
+
 interface DashboardData {
   today: TodayKpis;
   /** KPIs for the selected date range (equals `today` when days === 1). */
@@ -47,6 +68,8 @@ interface DashboardData {
   receivables: number | null;
   payables: number | null;
   stock: { lowStockCount: number; outOfStock: number; lowStock: Array<{ id: string; name: string; stock: number; reorderPoint: number }> } | null;
+  /** Expired stock separated from stock expiring within 30 days. */
+  expiry: ExpiryAlerts | null;
   topProducts: Array<{ name: string; quantity: number; revenue: number }>;
   recentSales: Array<{ id: string; invoiceNumber: string; total: number; paymentMethod: string | null; createdAt: string; cashierName: string | null }>;
   categorySplit: Array<{ name: string; revenue: number }>;
@@ -178,6 +201,80 @@ export function DashboardClient({ userName, canSeeProfit, canSeeExpenses }: Dash
               </>
             )}
           </div>
+
+          {/* Expiration alerts — expired separated from approaching expiry */}
+          {data?.expiry && (data.expiry.expiredCount > 0 || data.expiry.expiringCount > 0) && (
+            <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-orange-900">Expiration alerts</h3>
+                  <p className="text-xs text-orange-700">
+                    Expired stock is separated from stock expiring within the next {data.expiry.windowDays} days.
+                  </p>
+                </div>
+                <Link href="/inventory?expiry=all" className="text-xs font-semibold text-orange-800 hover:underline">
+                  Open filtered inventory →
+                </Link>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Link
+                  href="/inventory?expiry=expired"
+                  className="flex items-center justify-between rounded-xl border border-rose-200 bg-white px-3 py-2 transition hover:border-rose-400"
+                >
+                  <span className="text-sm font-medium text-rose-700">Expired</span>
+                  <span className="text-lg font-bold text-rose-800">
+                    {data.expiry.expiredCount} <span className="text-xs font-medium text-rose-500">products · {data.expiry.expiredQty} units</span>
+                  </span>
+                </Link>
+                <Link
+                  href="/inventory?expiry=expiring"
+                  className="flex items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-2 transition hover:border-amber-400"
+                >
+                  <span className="text-sm font-medium text-amber-700">Expiring within {data.expiry.windowDays} days</span>
+                  <span className="text-lg font-bold text-amber-800">
+                    {data.expiry.expiringCount} <span className="text-xs font-medium text-amber-500">products · {data.expiry.expiringQty} units</span>
+                  </span>
+                </Link>
+              </div>
+
+              <ul className="mt-3 divide-y divide-orange-100 overflow-hidden rounded-xl border border-orange-200 bg-white">
+                {data.expiry.items.slice(0, 8).map((item) => (
+                  <li key={`${item.productId}-${item.batchNumber}-${item.expirationDate}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-900">
+                        {item.name}
+                        {item.batchNumber && (
+                          <span className="ms-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                            batch {item.batchNumber}
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-slate-400">
+                        {[item.sku, item.barcode].filter(Boolean).join(" · ")}
+                        {item.quantity ? ` · ${item.quantity} units` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 text-xs">
+                      <span className="text-slate-500">{new Date(item.expirationDate).toLocaleDateString()}</span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 font-semibold",
+                          item.status === "expired"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-amber-100 text-amber-700"
+                        )}
+                      >
+                        {item.status === "expired"
+                          ? `Expired ${Math.abs(item.daysRemaining)}d ago`
+                          : `${item.daysRemaining}d left`}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Charts */}
           <div className="mt-6 grid gap-4 lg:grid-cols-3">

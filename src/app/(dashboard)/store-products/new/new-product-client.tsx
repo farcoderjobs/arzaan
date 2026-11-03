@@ -9,6 +9,7 @@ import { success, error as toastError } from "@/utils/toast";
 import { apiErrorMessage } from "@/lib/api";
 import { money } from "@/lib/currency";
 import { cn } from "@/utils/classname";
+import { StoreCategoryField } from "@/components/store/category-field";
 
 const ACCENT_OPTIONS = [
   { value: "indigo", label: "Indigo" },
@@ -39,6 +40,7 @@ const EMPTY_FORM = {
   accent: "indigo",
   imageUrl: "",
   category: "General",
+  categoryId: "",
   stock: 0,
   featured: false,
   status: "active" as "active" | "inactive",
@@ -86,6 +88,7 @@ export function NewStoreProductClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          categoryId: form.categoryId || null,
           price: Number(form.price),
           compareAtPrice: Number(form.compareAtPrice),
           stock: Number(form.stock),
@@ -172,13 +175,12 @@ export function NewStoreProductClient() {
               />
             </FormField>
 
-            <FormField label="Category" hint="Free text — used for storefront filters">
-              <Input
-                value={form.category}
-                onChange={(e) => set("category", e.target.value)}
-                placeholder="e.g. Beverages"
-              />
-            </FormField>
+            <StoreCategoryField
+              categoryId={form.categoryId}
+              category={form.category}
+              error={fieldErrors.categoryId}
+              onChange={({ categoryId, category }) => setForm((prev) => ({ ...prev, categoryId, category }))}
+            />
 
             <FormField label="Stock" required hint="Units available to online buyers">
               <Input

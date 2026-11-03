@@ -8,9 +8,12 @@ import { SyncClient } from "./sync-client";
 export const metadata: Metadata = { title: "Sync Center" };
 
 /**
- * Sync Center — shows the offline queue (IndexedDB) and lets authorized
- * users force/retry synchronization. Viewing requires sales.view; acting
- * (sync now / retry) requires sales.create.
+ * Sync Center — the shop node's link to the online center.
+ *
+ * Everything shown here lives in the LOCAL database: pending changes, retry
+ * attempts, conflicts and run history. Viewing requires sales.view; syncing and
+ * retrying require sales.create; the full re-push (recovery after a center
+ * restore) requires settings.manage.
  */
 export default async function SyncPage() {
   const user = await requireSessionUser();
@@ -18,5 +21,6 @@ export default async function SyncPage() {
     redirect("/dashboard");
   }
   const canSync = await hasPermission(user, PERMISSIONS.sales.create);
-  return <SyncClient canSync={canSync} />;
+  const canManage = await hasPermission(user, PERMISSIONS.settings.manage);
+  return <SyncClient canSync={canSync} canManage={canManage} />;
 }

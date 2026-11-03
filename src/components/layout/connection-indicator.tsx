@@ -1,55 +1,76 @@
 "use client";
 
-import { useConnectivity } from "@/lib/offline/use-connectivity";
+import { useSyncStatus } from "@/lib/sync/use-sync-status";
+import { describeSyncState } from "@/lib/sync/status-types";
 import { useT } from "@/i18n/client";
 import { cn } from "@/utils/classname";
 
 /**
- * Persistent connectivity / sync indicator shown in the app header.
+ * Connectivity / sync indicator for the header.
  *
- * Shows ONLINE (green), OFFLINE (red), SYNCING (amber, animated) or
- * SYNC COMPLETE (blue) plus the number of sales waiting to sync.
+ * It reflects the SHOP NODE's link to the online center, not the browser's own
+ * connectivity: the browser always talks to the local server, and everything it
+ * saves is already durable locally. "Offline" therefore means "the center has
+ * not received the latest changes yet", which is a state the shop works in
+ * normally.
  */
 export function ConnectionIndicator() {
-  const { status, pendingCount } = useConnectivity();
+  const { status, error } = useSyncStatus();
   const t = useT();
 
-  const label =
-    status === "ONLINE"
+  const state = describeSyncState(status);
+  const pending = status
+    ? status.counts.pending + status.counts.sending + status.counts.failed
+    : 0;
+
+  const label = error
+    ? t.offline.offline
+    : state === "ONLINE"
       ? t.offline.online
-      : status === "OFFLINE"
+      : state === "OFFLINE"
         ? t.offline.offline
-        : status === "SYNCING"
+        : state === "SYNCING"
           ? t.offline.syncing
-          : t.offline.syncComplete;
+          : state === "SYNC_COMPLETE"
+            ? t.offline.syncComplete
+            : t.offline.notConfigured;
+
+  const title = error
+    ? t.offline.localServerError
+    : pending > 0
+      ? t.offline.pendingCount.replace("{count}", String(pending))
+      : label;
 
   return (
     <div
       role="status"
       aria-live="polite"
-      data-status={status.toLowerCase()}
+      data-status={state.toLowerCase()}
+      data-sync-indicator
       className={cn(
         "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium",
-        status === "ONLINE" && "border-emerald-200 bg-emerald-50 text-emerald-700",
-        status === "OFFLINE" && "border-red-200 bg-red-50 text-red-700",
-        status === "SYNCING" && "border-amber-200 bg-amber-50 text-amber-700",
-        status === "SYNC_COMPLETE" && "border-blue-200 bg-blue-50 text-blue-700"
+        state === "ONLINE" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+        state === "OFFLINE" && "border-amber-200 bg-amber-50 text-amber-700",
+        state === "SYNCING" && "border-blue-200 bg-blue-50 text-blue-700",
+        state === "SYNC_COMPLETE" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+        state === "UNCONFIGURED" && "border-slate-200 bg-slate-50 text-slate-600"
       )}
-      title={pendingCount > 0 ? t.offline.pendingCount.replace("{count}", String(pendingCount)) : label}
+      title={title}
     >
       <span
         className={cn(
           "h-2 w-2 rounded-full",
-          status === "ONLINE" && "bg-emerald-500",
-          status === "OFFLINE" && "bg-red-500",
-          status === "SYNCING" && "animate-pulse bg-amber-500",
-          status === "SYNC_COMPLETE" && "bg-blue-500"
+          state === "ONLINE" && "bg-emerald-500",
+          state === "OFFLINE" && "bg-amber-500",
+          state === "SYNCING" && "animate-pulse bg-blue-500",
+          state === "SYNC_COMPLETE" && "bg-emerald-500",
+          state === "UNCONFIGURED" && "bg-slate-400"
         )}
       />
       <span className="hidden sm:inline">{label}</span>
-      {pendingCount > 0 && (
+      {pending > 0 && (
         <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">
-          {pendingCount}
+          {pending}
         </span>
       )}
     </div>

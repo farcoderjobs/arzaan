@@ -34,12 +34,44 @@ export const ALL_PERMISSIONS = [
   { name: "sales.cancel", description: "Cancel sales", category: "Sales" },
   { name: "sales.refund", description: "Process refunds", category: "Sales" },
   { name: "sales.discount", description: "Apply discounts to sales", category: "Sales" },
+  { name: "sales.wholesale", description: "Apply wholesale price tiers at POS", category: "Sales" },
+  { name: "sales.override_expired", description: "Sell expired stock with a logged override", category: "Sales" },
+
+  // Departments
+  { name: "departments.view", description: "View departments", category: "Departments" },
+  { name: "departments.create", description: "Create departments", category: "Departments" },
+  { name: "departments.update", description: "Update departments and assignments", category: "Departments" },
+  { name: "departments.deactivate", description: "Deactivate departments", category: "Departments" },
+
+  // Attendance & payroll
+  { name: "attendance.view", description: "View attendance records", category: "Payroll" },
+  { name: "attendance.manage", description: "Mark and correct attendance", category: "Payroll" },
+  { name: "payroll.view", description: "View salary configuration and payroll", category: "Payroll" },
+  { name: "payroll.manage", description: "Configure salaries and finalize payroll", category: "Payroll" },
 
   // Purchases
   { name: "purchases.view", description: "View purchases", category: "Purchases" },
+  { name: "purchases.import", description: "Record Import (China) purchases", category: "Purchases" },
   { name: "purchases.create", description: "Create purchases", category: "Purchases" },
   { name: "purchases.update", description: "Update purchases", category: "Purchases" },
   { name: "purchases.cancel", description: "Cancel purchases", category: "Purchases" },
+
+  // Customer loyalty bonus
+  { name: "bonus.view", description: "View customer bonus balances and ledger", category: "Bonus" },
+  { name: "bonus.redeem", description: "Redeem customer bonus at POS", category: "Bonus" },
+  { name: "bonus.configure", description: "Configure customer bonus rules and rates", category: "Bonus" },
+  { name: "bonus.adjust", description: "Manually adjust a customer's bonus balance", category: "Bonus" },
+  { name: "bonus.reports", description: "View customer bonus reports", category: "Bonus" },
+
+  // Employee purchases
+  { name: "employee_purchases.view", description: "View employee purchases and balances", category: "Employee Purchases" },
+  { name: "employee_purchases.process", description: "Process purchases on behalf of an employee", category: "Employee Purchases" },
+  { name: "employee_purchases.apply_benefit", description: "Apply the employee purchase benefit", category: "Employee Purchases" },
+  { name: "employee_purchases.pay", description: "Record employee purchase payments", category: "Employee Purchases" },
+  { name: "employee_purchases.approve_credit", description: "Approve employee purchases on credit", category: "Employee Purchases" },
+  { name: "employee_purchases.approve_deduction", description: "Approve or exclude payroll deductions", category: "Employee Purchases" },
+  { name: "employee_purchases.configure", description: "Configure employee benefit rates and limits", category: "Employee Purchases" },
+  { name: "employee_purchases.reports", description: "View employee purchase reports", category: "Employee Purchases" },
 
   // Customers
   { name: "customers.view", description: "View customers", category: "Customers" },
@@ -74,6 +106,14 @@ export const ALL_PERMISSIONS = [
   { name: "reports.profit", description: "View profit reports", category: "Reports" },
   { name: "reports.finance", description: "View finance reports", category: "Reports" },
   { name: "reports.store", description: "View online store reports", category: "Reports" },
+  { name: "reports.departments", description: "View department sales and profit reports", category: "Reports" },
+
+  // Warehouse / stock transfers
+  { name: "transfers.view", description: "View stock transfers", category: "Warehouse" },
+  { name: "transfers.create", description: "Create stock transfers", category: "Warehouse" },
+  { name: "transfers.dispatch", description: "Dispatch stock transfers", category: "Warehouse" },
+  { name: "transfers.receive", description: "Receive stock transfers", category: "Warehouse" },
+  { name: "transfers.cancel", description: "Cancel stock transfers", category: "Warehouse" },
 
   // Online Store (public ecommerce storefront)
   { name: "store.view", description: "View online store products", category: "Online Store" },
@@ -123,6 +163,25 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "brands.update",
     "brands.delete",
 
+    // Departments
+    "departments.view",
+    "departments.create",
+    "departments.update",
+    "departments.deactivate",
+
+    // Attendance & payroll
+    "attendance.view",
+    "attendance.manage",
+    "payroll.view",
+    "payroll.manage",
+
+    // Warehouse
+    "transfers.view",
+    "transfers.create",
+    "transfers.dispatch",
+    "transfers.receive",
+    "transfers.cancel",
+
     // Inventory
     "inventory.view",
     "inventory.adjust",
@@ -134,12 +193,32 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "sales.cancel",
     "sales.refund",
     "sales.discount",
+    "sales.wholesale",
+    "sales.override_expired",
 
     // Purchases
     "purchases.view",
     "purchases.create",
+    "purchases.import",
     "purchases.update",
     "purchases.cancel",
+
+    // Customer bonus
+    "bonus.view",
+    "bonus.redeem",
+    "bonus.configure",
+    "bonus.adjust",
+    "bonus.reports",
+
+    // Employee purchases
+    "employee_purchases.view",
+    "employee_purchases.process",
+    "employee_purchases.apply_benefit",
+    "employee_purchases.pay",
+    "employee_purchases.approve_credit",
+    "employee_purchases.approve_deduction",
+    "employee_purchases.configure",
+    "employee_purchases.reports",
 
     // Customers
     "customers.view",
@@ -174,6 +253,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "reports.profit",
     "reports.finance",
     "reports.store",
+    "reports.departments",
 
     // Online Store
     "store.view",
@@ -201,10 +281,17 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   Cashier: [
     "dashboard.view",
     "products.view",
+    "departments.view",
     "sales.view",
     "sales.create",
     "sales.cancel",
     "sales.refund",
+    "sales.discount",
+    "bonus.view",
+    "bonus.redeem",
+    "employee_purchases.process",
+    "employee_purchases.apply_benefit",
+    "employee_purchases.view",
     "customers.view",
     "customers.payment",
     "cash_register.view",
@@ -214,6 +301,12 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 
   InventoryManager: [
     "dashboard.view",
+    "departments.view",
+    "transfers.view",
+    "transfers.create",
+    "transfers.dispatch",
+    "transfers.receive",
+    "transfers.cancel",
     "products.view",
     "products.create",
     "products.update",
@@ -238,6 +331,17 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 
   Accountant: [
     "dashboard.view",
+    "departments.view",
+    "attendance.view",
+    "payroll.view",
+    "bonus.view",
+    "bonus.adjust",
+    "bonus.reports",
+    "employee_purchases.view",
+    "employee_purchases.pay",
+    "employee_purchases.approve_deduction",
+    "employee_purchases.reports",
+    "reports.departments",
     "purchases.view",
     "purchases.create",
     "purchases.update",

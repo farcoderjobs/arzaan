@@ -35,7 +35,7 @@ export async function GET(
         saleId: (saleReturn.saleId as unknown as { _id: unknown })?._id?.toString?.() ?? null,
         saleInvoiceNumber: (saleReturn.saleId as unknown as { invoiceNumber: string })?.invoiceNumber ?? "",
         items: saleReturn.items.map((i) => ({
-          productId: i.productId.toString(),
+          productId: i.productId?.toString() ?? "",
           name: i.name,
           sku: i.sku,
           quantity: i.quantity,

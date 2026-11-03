@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
-import { Branch, User, Product } from "@/models";
+import { Branch, User, Product, Sale } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -24,6 +24,8 @@ const createSchema = z.object({
   currency: z.string().length(3, "Currency is a 3-letter code").default("AFN"),
   taxRate: z.number().min(0).max(100).default(0),
   status: z.enum(["active", "inactive"]).default("active"),
+  /** A warehouse is a stock location (never a selling register). */
+  type: z.enum(["shop", "warehouse"]).default("shop"),
 });
 
 const updateSchema = createSchema.partial().extend({
@@ -48,9 +50,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const withCounts = searchParams.get("withCounts") === "1";
 
-    // Branch-restricted users may only see their own branch.
+    // Whoever manages settings must see every branch, otherwise a newly added
+    // shop or warehouse never shows up in the Branches listing. Everyone else
+    // stays restricted to their own branch.
+    const canManage = await hasPermission(user, PERMISSIONS.settings.manage);
     const query: Record<string, unknown> = {};
-    if (user.branchId) query._id = new mongoose.Types.ObjectId(user.branchId);
+    if (user.branchId && !canManage) query._id = new mongoose.Types.ObjectId(user.branchId);
 
     const branches = await Branch.find(query).sort({ name: 1 }).lean();
 
@@ -69,6 +74,7 @@ export async function GET(req: NextRequest) {
         currency: b.currency,
         taxRate: b.taxRate,
         status: b.status,
+        type: b.type ?? "shop",
         userCount: countMap.get(b._id.toString()) ?? 0,
         createdAt: b.createdAt,
       })),
@@ -108,6 +114,7 @@ export async function POST(req: NextRequest) {
         currency: data.currency.toUpperCase(),
         taxRate: data.taxRate,
         status: data.status,
+        type: data.type,
       });
 
       await recordAuditLog({
@@ -140,6 +147,7 @@ export async function POST(req: NextRequest) {
       currency: branch.currency,
       taxRate: branch.taxRate,
       status: branch.status,
+      type: branch.type ?? "shop",
     };
 
     if (changes.code !== undefined) {
@@ -155,6 +163,19 @@ export async function POST(req: NextRequest) {
     if (changes.phone !== undefined) branch.phone = changes.phone.trim();
     if (changes.currency !== undefined) branch.currency = changes.currency.toUpperCase();
     if (changes.taxRate !== undefined) branch.taxRate = changes.taxRate;
+    if (changes.type !== undefined) {
+      if (changes.type === "warehouse" && changes.type !== branch.type) {
+        // A shop with recorded sales cannot silently become a warehouse.
+        const sales = await Sale.countDocuments({ branchId: branch._id });
+        if (sales > 0) {
+          return NextResponse.json(
+            badRequest(`Cannot convert to a warehouse: ${sales} sale(s) are recorded at this shop`),
+            { status: 400 }
+          );
+        }
+      }
+      branch.type = changes.type;
+    }
     if (changes.status !== undefined) {
       if (changes.status === "inactive") {
         const activeUsers = await User.countDocuments({ branchId: branch._id, status: "active" });
@@ -184,6 +205,7 @@ export async function POST(req: NextRequest) {
         currency: branch.currency,
         taxRate: branch.taxRate,
         status: branch.status,
+        type: branch.type ?? "shop",
       }),
       ...meta,
     });

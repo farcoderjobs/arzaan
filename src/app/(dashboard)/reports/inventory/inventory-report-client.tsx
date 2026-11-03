@@ -100,6 +100,12 @@ export function InventoryReportClient() {
           return isMovement(String(m.movementType ?? "")) ? (m.note || "—") : "—";
         } },
         { key: "userName", header: "By", render: (r) => (r as MovementRow).userName ?? "—" },
+        { key: "sellingPrice", header: "Unit Selling Price", align: "right", render: (r) => {
+          const s = r as StockRow;
+          // Variants are separate product rows, so this is always the actual
+          // single-piece price for that sellable product.
+          return !isMovement(String((r as MovementRow).movementType ?? "")) ? money(s.sellingPrice ?? 0) : "—";
+        } },
         { key: "value", header: "Value", align: "right", render: (r) => {
           const s = r as StockRow;
           return !isMovement(String((r as MovementRow).movementType ?? "")) ? money(s.value) : "—";

@@ -25,10 +25,16 @@ async function main() {
 
   const password = process.env.QA_USER_PASSWORD ?? "qa-test-pass-123!";
 
+  // The QA seed bootstraps a database that has no shop node behind it yet, so
+  // its writes must stay OUT of the sync outbox: without this, every seeded
+  // role, branch and user is queued with no acting user and the first sync run
+  // turns the whole bootstrap into permanent PERMISSION_DENIED conflicts.
+  process.env.NODE_ROLE = "center";
+
   // Imported lazily so the guard above runs before any app module reads env.
   const mongoose = (await import("mongoose")).default;
   const { seedRoles } = (await import("../src/models/permissions"));
-  const { User, Branch, Role } = (await import("../src/models"));
+  const { User, Branch, Role, SyncNode } = (await import("../src/models"));
   const { hashPassword } = (await import("../src/utils/auth"));
 
   await mongoose.connect(uri, { dbName, serverSelectionTimeoutMS: 20_000 });
@@ -86,6 +92,20 @@ async function main() {
       lastLoginAt: new Date(),
     });
   }
+
+  // A fixed shop-node identity for the e2e suite: the Playwright webServer is
+  // started with the matching SYNC_NODE_ID / SYNC_NODE_KEY, and its
+  // SYNC_ONLINE_URL points at the center stub the offline-sync spec controls.
+  const { hashNodeKey } = (await import("../src/lib/sync/node-auth"));
+  const e2eNodeId = "qa-e2e-node";
+  const e2eNodeKey = "qa-e2e-node-key-01";
+  await SyncNode.create({
+    nodeId: e2eNodeId,
+    name: "QA E2E node",
+    keyHash: hashNodeKey(e2eNodeKey),
+    branchId: null,
+    status: "active",
+  });
 
   console.log(
     `[qa-seed] Done. Roles: ${roles.map((r) => r.name).join(", ")} | Users: ${users.map((u) => u.email).join(", ")}`

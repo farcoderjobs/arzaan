@@ -19,6 +19,8 @@ import { revalidatePath } from "next/cache";
 import { recordCashMovementIfDrawerOpen } from "@/lib/finance-service";
 import { recordAuditLog, requestMeta, diffForAudit } from "@/lib/audit";
 import { assertBranchAccess, BranchAccessError } from "@/lib/branch-access";
+import { generatePurchaseNumber } from "@/lib/document-number";
+import { Department } from "@/models";
 
 const purchaseItemSchema = z.object({
   productId: z.string().min(1, "Product is required"),
@@ -27,10 +29,18 @@ const purchaseItemSchema = z.object({
   sellingPrice: z.number().min(0, "Price cannot be negative").optional().default(0),
   discount: z.number().min(0).max(100).default(0),
   tax: z.number().min(0).max(100).default(0),
+  /** Optional expiry for THIS received batch (separate batches may differ). */
+  expirationDate: z.string().trim().nullable().optional(),
+  /** Optional human batch code; auto-generated when only an expiry is given. */
+  batchNumber: z.string().trim().max(60).optional(),
 });
 
 const createPurchaseSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
+  /** Import (China) stock is owner/manager-controlled; Local is the default. */
+  purchaseSource: z.enum(["import", "local"]).default("local"),
+  /** Department (mini-store) the local stock is bought for; null = the shop. */
+  departmentId: z.string().nullable().optional(),
   items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
   discount: z.number().min(0).max(100).default(0),
   tax: z.number().min(0).max(100).default(0),
@@ -57,10 +67,12 @@ export async function GET(req: NextRequest) {
     const perPage = Math.min(100, Math.max(1, Number(searchParams.get("perPage") ?? 15)));
     const supplierId = searchParams.get("supplierId")?.trim() ?? "";
     const status = searchParams.get("status")?.trim() ?? "";
+    const source = searchParams.get("source")?.trim() ?? "";
 
     const query: Record<string, unknown> = {};
     if (status) query.status = status;
     if (supplierId) query.supplierId = supplierId;
+    if (source === "import" || source === "local") query.purchaseSource = source;
 
     const total = await Purchase.countDocuments(query);      const purchases = await Purchase.find(query)
       .populate<{ supplierId: { name: string } }>("supplierId", "name")
@@ -112,9 +124,40 @@ export async function POST(req: NextRequest) {
 
       const data = parsed.data;
 
+      // Server-side enforcement, not just a hidden UI option: only holders of
+      // purchases.import may record Import (China) stock.
+      if (data.purchaseSource === "import" && !(await hasPermission(user, PERMISSIONS.purchases.importStock))) {
+        return NextResponse.json(
+          forbidden("Import (China) purchases require manager authorisation"),
+          { status: 403 }
+        );
+      }
+
       const supplier = await Supplier.findById(data.supplierId);
       if (!supplier) {
         return NextResponse.json(notFound("Supplier not found"), { status: 404 });
+      }
+
+      // Local stock can be bought for a department (a mini-store inside the
+      // shop). "Shop" is the default and means the store's own stock.
+      let departmentId: mongoose.Types.ObjectId | null = null;
+      let departmentName = "Shop";
+      if (data.purchaseSource === "local" && data.departmentId) {
+        if (!mongoose.Types.ObjectId.isValid(data.departmentId)) {
+          return NextResponse.json(badRequest("Invalid department"), { status: 400 });
+        }
+        const department = await Department.findById(data.departmentId)
+          .select("name branchId status")
+          .lean();
+        if (!department) return NextResponse.json(notFound("Department not found"), { status: 404 });
+        if (department.status !== "active") {
+          return NextResponse.json(badRequest("The selected department is inactive"), { status: 400 });
+        }
+        if (supplier.branchId && String(department.branchId) !== String(supplier.branchId)) {
+          return NextResponse.json(badRequest("The department belongs to a different shop"), { status: 400 });
+        }
+        departmentId = department._id;
+        departmentName = department.name;
       }
 
       // Fetch products and snapshot names/prices
@@ -131,14 +174,29 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Every received line may carry its own expiry/batch. Invalid dates are
+      // rejected up front instead of silently dropping the expiry information.
+      const parsedExpiries = data.items.map((item) => {
+        if (!item.expirationDate) return null;
+        const date = new Date(item.expirationDate);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+      });
+      if (parsedExpiries.some((d) => d === undefined)) {
+        return NextResponse.json(badRequest("Invalid expiration date"), { status: 400 });
+      }
+
       const now = new Date();
-      const purchaseNumber = `PUR-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const purchaseNumber = generatePurchaseNumber(now);
 
       let subtotal = 0;
-      const itemsWithSnapshot = data.items.map((item) => {
+      const itemsWithSnapshot = data.items.map((item, index) => {
         const product = productMap.get(item.productId)!;
         const itemSubtotal = item.quantity * item.purchasePrice;
         subtotal += itemSubtotal;
+        const expirationDate = parsedExpiries[index] ?? null;
+        const batchNumber = expirationDate
+          ? item.batchNumber?.trim() || `${purchaseNumber}-${index + 1}`
+          : item.batchNumber?.trim() ?? "";
         return {
           productId: item.productId,
           name: product.name,
@@ -149,6 +207,8 @@ export async function POST(req: NextRequest) {
           discount: item.discount,
           tax: item.tax,
           subtotal: itemSubtotal,
+          batchNumber,
+          expirationDate,
         };
       });
 
@@ -162,6 +222,9 @@ export async function POST(req: NextRequest) {
         purchaseNumber,
         supplierId: data.supplierId,
         branchId: supplier.branchId ?? null,
+        purchaseSource: data.purchaseSource,
+        departmentId,
+        departmentName,
         status: "pending",
         items: itemsWithSnapshot,
         subtotal,
@@ -183,6 +246,9 @@ export async function POST(req: NextRequest) {
           movementType: "PURCHASE_IN",
           quantity: item.quantity,
           unitCost: item.purchasePrice,
+          batchNumber: item.batchNumber ?? "",
+          expirationDate: item.expirationDate ?? null,
+          purchaseSource: purchase.purchaseSource,
           referenceType: "purchase",
           referenceId: purchase._id,
           note: `Purchase ${purchaseNumber}`,
@@ -252,7 +318,7 @@ export async function POST(req: NextRequest) {
         action: "purchase.create",
         entityType: "Purchase",
         entityId: purchase._id.toString(),
-        newValue: { purchaseNumber: purchase.purchaseNumber, total, supplierId: data.supplierId, items: itemsWithSnapshot.length },
+        newValue: { purchaseNumber: purchase.purchaseNumber, total, supplierId: data.supplierId, purchaseSource: purchase.purchaseSource, departmentName, items: itemsWithSnapshot.length },
         branchId: purchase.branchId?.toString(),
         ...meta,
       });
@@ -288,6 +354,11 @@ export async function POST(req: NextRequest) {
             movementType: "SUPPLIER_RETURN_OUT",
             quantity: item.quantity,
             unitCost: item.purchasePrice,
+            // Reverse the SAME batch so its remaining quantity (and expiry
+            // alert) disappears with the cancelled receipt.
+            batchNumber: item.batchNumber ?? "",
+            expirationDate: item.expirationDate ?? null,
+            purchaseSource: purchase.purchaseSource ?? "local",
             referenceType: "purchase",
             referenceId: purchase._id,
             note: `Cancellation of purchase ${purchase.purchaseNumber}`,
@@ -319,6 +390,9 @@ export async function POST(req: NextRequest) {
           movementType: "SUPPLIER_RETURN_OUT",
           quantity: item.quantity,
           unitCost: item.purchasePrice,
+          batchNumber: item.batchNumber ?? "",
+          expirationDate: item.expirationDate ?? null,
+          purchaseSource: purchase.purchaseSource ?? "local",
           referenceType: "purchase",
           referenceId: purchase._id,
           note: `Cancellation of purchase ${purchase.purchaseNumber}`,

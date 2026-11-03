@@ -1,9 +1,13 @@
 /**
  * App-shell service worker (offline-first POS).
  *
+ * The shell exists so the POS still loads if the local server restarts; the data
+ * itself always comes from that server.
+ *
  * Policy:
- *  - API (/api/*) is NEVER cached or intercepted — sales/products data flows
- *    only through the app's IndexedDB layer with explicit idempotent sync.
+ *  - API (/api/*) is NEVER cached or intercepted — every sale and query goes
+ *    to the local server, which owns this shop's MongoDB database and pushes
+ *    the changes to the online database on its own schedule.
  *  - Hashed static assets (/_next/static/) → cache-first (immutable).
  *  - Navigations → network-first; offline falls back to the cached copy of
  *    the page, then to the offline page, then a plain-text 503.
