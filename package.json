@@ -15,6 +15,8 @@
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "seed": "tsx src/scripts/seed.ts",
     "seed:store": "tsx src/scripts/seed-store-products.ts",
+    "seed:export": "tsx scripts/export-seed-data.ts",
+    "seed:data": "tsx scripts/seed-all-data.ts",
     "db:hydrate": "tsx scripts/hydrate-local-db.ts",
     "db:check": "tsx scripts/check-local-db.ts"
   },
