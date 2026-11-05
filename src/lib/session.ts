@@ -1,5 +1,6 @@
 import { getCurrentUser, requireAuth } from "@/lib/auth";
 import { beginSyncActor } from "@/lib/sync/tracking";
+import { assertLicenseActive } from "@/lib/license";
 import { getUserPermissions, hasPermission as checkPermission, requirePermission as checkRequiredPermission } from "@/lib/authorization";
 import { PermissionName } from "@/lib/authorization";
 import { AuthUser } from "@/lib/auth";
@@ -29,6 +30,10 @@ export async function requireSessionUser(): Promise<SessionUser> {
   // filling it in after the awaits gives the whole request (and the mongoose
   // hooks that queue replication) one shared, mutable actor object.
   const actor = beginSyncActor();
+
+  // Every authenticated page and API route passes through here, so an expired
+  // subscription stops the whole application (not just the screens).
+  await assertLicenseActive();
 
   const user = await requireAuth();
   const perms = await getUserPermissions(user.id, user.roleId);

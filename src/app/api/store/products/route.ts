@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { StoreProduct } from "@/models";
 import { categoryKeyFor, resolveStorefrontCategories } from "@/lib/store-categories";
+import { getLicenseState } from "@/lib/license";
 
 /**
  * GET /api/store/products  (PUBLIC — the ecommerce storefront)
@@ -9,6 +10,17 @@ import { categoryKeyFor, resolveStorefrontCategories } from "@/lib/store-categor
  * admin-curated StoreProduct rows (separate from the POS product catalog).
  */
 export async function GET() {
+  const license = await getLicenseState();
+  if (license.blocked) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "LICENSE_EXPIRED", message: "This shop's subscription has expired." },
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     await connectDB();
 

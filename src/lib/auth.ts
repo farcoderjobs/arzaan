@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { assertLicenseActive } from "@/lib/license";
 import { User } from "@/models";
 import { connectDB } from "@/lib/mongodb";
 import {
@@ -160,6 +161,8 @@ export async function refreshSession(): Promise<AuthResult | null> {
 }
 
 export async function login(email: string, password: string): Promise<AuthResult> {
+  // Refuse to hand out a session for an installation whose subscription lapsed.
+  await assertLicenseActive();
   await connectDB();
   const env = getEnv();
   const user = await User.findOne({ email: email.toLowerCase(), status: "active" }).select("+passwordHash").lean();

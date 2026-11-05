@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/mongodb";
 import { StoreOrder, StoreProduct } from "@/models";
 import { badRequest } from "@/lib/api";
 import { round2 } from "@/lib/commerce";
+import { getLicenseState } from "@/lib/license";
 
 /**
  * POST /api/store/orders  (PUBLIC — storefront checkout)
@@ -39,6 +40,19 @@ const checkoutSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Checkout is part of the installed build, so an expired licence refuses the
+  // order here as well as on the storefront page.
+  const license = await getLicenseState();
+  if (license.blocked) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "LICENSE_EXPIRED", message: "This shop's subscription has expired." },
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     await connectDB();
 

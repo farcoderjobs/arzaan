@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/session";
 import { isDatabaseUnavailable } from "@/lib/db-errors";
+import { isLicenseBlocked } from "@/lib/license";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
@@ -18,6 +19,9 @@ export default async function DashboardLayout({
     // request to the error boundary, which explains how to start the local
     // MongoDB; redirecting to /login used to make every page look broken.
     if (isDatabaseUnavailable(err)) throw err;
+    // A lapsed licence is not a wrong password: send the user to the renewal
+    // screen instead of looping them through the login form.
+    if (isLicenseBlocked(err)) redirect("/activate");
     redirect("/login");
   }
 

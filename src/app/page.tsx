@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getLicenseState } from "@/lib/license";
 import { connectDB } from "@/lib/mongodb";
 import { StoreProduct } from "@/models";
 import { getStoreSettings } from "@/lib/settings";
@@ -32,6 +34,11 @@ export default async function StoreHomePage({
 }: {
   searchParams: Promise<{ category?: string | string[] }>;
 }) {
+  // The storefront ships with the same build: an expired subscription closes it
+  // too, instead of quietly accepting orders nobody will fulfil.
+  const license = await getLicenseState();
+  if (license.blocked) redirect("/activate");
+
   const params = await searchParams;
   const requestedCategory = Array.isArray(params.category) ? params.category[0] : params.category;
 

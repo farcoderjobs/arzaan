@@ -2190,6 +2190,52 @@ SyncAppliedOpSchema.index({ nodeId: 1, rowKey: 1 }, { unique: true });
 SyncAppliedOpSchema.index({ appliedAt: -1 });
 
 /* ----------------------------------------------------------------------------
+ * Licence / subscription
+ * ------------------------------------------------------------------------- */
+
+export interface ILicenseActivation {
+  at: Date;
+  until: Date;
+  note: string;
+}
+
+export interface ILicenseDocument extends Document {
+  key: string;
+  installedAt: Date;
+  paidUntil: Date;
+  /** HMAC of `installedAt|paidUntil`; a hand-edited paidUntil stops matching. */
+  signature: string;
+  activations: ILicenseActivation[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const LicenseActivationSchema = new Schema<ILicenseActivation>(
+  {
+    at: { type: Date, required: true },
+    until: { type: Date, required: true },
+    note: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+/**
+ * One document per installation. NOT replicated: it describes this server's
+ * subscription, not the business, so it must never be pushed to the center nor
+ * travel inside a seed snapshot.
+ */
+export const LicenseSchema = new Schema<ILicenseDocument>(
+  {
+    key: { type: String, required: true, unique: true, default: "install" },
+    installedAt: { type: Date, required: true },
+    paidUntil: { type: Date, required: true },
+    signature: { type: String, required: true },
+    activations: { type: [LicenseActivationSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
+/* ----------------------------------------------------------------------------
  * Dirty-document tracking
  *
  * Every replicated schema queues a marker whenever the app writes one of its
@@ -2256,6 +2302,7 @@ export const PermissionModel = getModel<IPermissionDocument>("Permission", Permi
 export type Permission = IPermissionDocument;
 export const Permission = PermissionModel;
 export const User = getModel<IUserDocument>("User", UserSchema);
+export const License = getModel<ILicenseDocument>("License", LicenseSchema);
 export const Branch = getModel<IBranchDocument>("Branch", BranchSchema);
 export const Warehouse = getModel<IWarehouseDocument>("Warehouse", WarehouseSchema);
 export const Category = getModel<ICategoryDocument>("Category", CategorySchema);

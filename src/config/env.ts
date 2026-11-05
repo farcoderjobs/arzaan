@@ -74,6 +74,20 @@ export const envSchema = z.object({
   SYNC_PULL_ENABLED: optionalBool,
   /** Max outbox rows per push batch (default 200). */
   SYNC_BATCH_SIZE: optionalPositiveInt,
+
+  // ---------- Licence / subscription (required for an installed build) ----------
+  /**
+   * Password the customer is given to renew an expired installation. Without
+   * it the app still runs for its paid year, but activation is refused with a
+   * configuration message instead of failing silently.
+   */
+  LICENSE_PASSWORD: z.string().optional(),
+  /**
+   * Signs the licence record (so a hand-edited expiry date is detected). When
+   * unset, a key is derived from `JWT_SECRET`; rotating JWT_SECRET therefore
+   * requires re-activation, which the password always allows.
+   */
+  LICENSE_SECRET: z.string().min(16).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
