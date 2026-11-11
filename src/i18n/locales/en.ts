@@ -71,6 +71,7 @@ const en = {
     pos: "POS",
     products: "Products",
     categories: "Categories",
+    discounts: "Discounts",
     inventory: "Inventory",
     purchases: "Purchases",
     customers: "Customers",

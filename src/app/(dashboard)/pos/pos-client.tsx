@@ -63,6 +63,10 @@ interface PosProduct {
   expiredQty?: number;
   /** Units still sellable without an override (single barcode lookup only). */
   sellableQty?: number;
+  /** Active discount-offer percentage running today for this product. */
+  offerDiscountPercent?: number;
+  /** Offer name shown to the cashier next to the discounted line. */
+  offerName?: string;
 }
 
 interface CartItem {
@@ -76,6 +80,9 @@ interface CartItem {
   pricingMode?: "retail" | "wholesale";
   quantity: number;
   unitDiscount: number;
+  /** Automatic offer percent from the catalog (never editable as a cashier discount). */
+  offerPercent?: number;
+  offerName?: string;
   taxRate: number;
   maxStock: number;
   /** Direct-sale lines never affect stock (bought in the market). */
@@ -125,6 +132,12 @@ interface ReturnableLine {
   subtotal: number;
   returnedQuantity: number;
   returnableQuantity: number;
+  /** Full-line value actually paid, after sale discount and employee benefit. */
+  linePaid?: number;
+  /** Extra discount deducted from this line (sale discount + employee benefit). */
+  discountApplied?: number;
+  /** Refund for one returned unit of this line. */
+  unitRefund?: number;
 }
 
 interface RefundSale {
@@ -165,10 +178,16 @@ function computeTotals(items: CartItem[], saleDiscount: number, discountType: "a
   let lineDiscountTotal = 0;
   const lines = items.map((item) => {
     const gross = round2(item.unitPrice * item.quantity);
-    const discount =
+    const manualDiscount =
       discountType === "percent"
         ? round2((gross * Math.min(item.unitDiscount, MAX_DISCOUNT_PERCENT)) / 100)
         : round2(Math.min(item.unitDiscount, gross));
+    // Active offer percentage resolved by the products API and added on top of
+    // any cashier discount, before tax — mirrors computeSaleTotals on the server.
+    const offerDiscount = round2(
+      (gross * Math.min(Math.max(0, item.offerPercent ?? 0), MAX_DISCOUNT_PERCENT)) / 100
+    );
+    const discount = round2(Math.min(gross, manualDiscount + offerDiscount));
     const net = round2(gross - discount);
     const lineTax = round2((net * item.taxRate) / 100);
     subtotal = round2(subtotal + gross);
@@ -237,6 +256,8 @@ export function PosClient({
   const [refundLookupLoading, setRefundLookupLoading] = useState(false);
   const [refundError, setRefundError] = useState("");
   const [refundSale, setRefundSale] = useState<RefundSale | null>(null);
+  const [refundScan, setRefundScan] = useState("");
+  const [refundScanNote, setRefundScanNote] = useState("");
   const [refundLines, setRefundLines] = useState<Record<string, { quantity: string; restock: boolean }>>({});
   const [refundMode, setRefundMode] = useState<"refund" | "exchange">("refund");
   const [refundMethod, setRefundMethod] = useState<"cash" | "card" | "transfer" | "credit">("cash");
@@ -611,6 +632,8 @@ export function PosClient({
           pricingMode,
           quantity: qty,
           unitDiscount: 0,
+          offerPercent: product.offerDiscountPercent ?? 0,
+          offerName: product.offerName ?? "",
           taxRate: product.taxRate ?? 0,
           maxStock: product.currentStock,
         },
@@ -1121,7 +1144,16 @@ export function PosClient({
       const safe = Math.min(qty, line.returnableQuantity);
       if (safe <= 0) continue;
       items.push({ lineId: line.lineId, quantity: safe, restock: line.itemType === "inventory" && entry.restock !== false });
-      total += (line.subtotal * safe) / line.quantity;
+      // Refund what was actually paid per unit — the wholesale price, line and
+      // sale discounts and any employee benefit are already deducted by the
+      // server for this specific product.
+      const unitRefund =
+        typeof line.unitRefund === "number"
+          ? line.unitRefund
+          : line.quantity > 0
+            ? line.subtotal / line.quantity
+            : 0;
+      total += unitRefund * safe;
     }
     return { items, total: Math.round((total + Number.EPSILON) * 100) / 100 };
   }, [refundSale, refundLines]);
@@ -1131,6 +1163,8 @@ export function PosClient({
 
   function openRefund() {
     setRefundInvoice("");
+    setRefundScan("");
+    setRefundScanNote("");
     setRefundError("");
     setRefundSale(null);
     setRefundLines({});
@@ -1164,6 +1198,54 @@ export function PosClient({
         Object.fromEntries(
           (data.sale.items as ReturnableLine[]).map((line) => [line.lineId, { quantity: "", restock: true }])
         )
+      );
+    } catch {
+      setRefundError("Could not look up the sale");
+    } finally {
+      setRefundLookupLoading(false);
+    }
+  };
+
+  /**
+   * Refund by scanning the product instead of typing a receipt number. The
+   * server opens the newest sale that still has a returnable unit and the POS
+   * only fills in that line — prices stay the ones the customer paid.
+   */
+  const scanRefundProduct = async () => {
+    const term = refundScan.trim();
+    if (!term) {
+      setRefundError("Scan a product barcode first");
+      return;
+    }
+    setRefundLookupLoading(true);
+    setRefundError("");
+    setRefundScanNote("");
+    try {
+      const res = await fetch(`/api/pos/sales-lookup?barcode=${encodeURIComponent(term)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setRefundSale(null);
+        setRefundError(apiErrorMessage(data, "No returnable sale found for that barcode"));
+        return;
+      }
+      const lines = data.sale.items as ReturnableLine[];
+      const next: Record<string, { quantity: string; restock: boolean }> = Object.fromEntries(
+        lines.map((line) => [line.lineId, { quantity: "", restock: true }])
+      );
+      const matched = lines.find((line) => line.lineId === data.matchedLineId);
+      if (matched) {
+        next[matched.lineId] = {
+          quantity: String(Math.min(1, matched.returnableQuantity)),
+          restock: true,
+        };
+      }
+      setRefundSale(data.sale);
+      setRefundLines(next);
+      setRefundScan("");
+      setRefundScanNote(
+        matched
+          ? `${data.matchedProductName ?? matched.name} added from ${data.sale.invoiceNumber} — refund ${money(matched.unitRefund ?? matched.sellingPrice)} per unit`
+          : ""
       );
     } catch {
       setRefundError("Could not look up the sale");
@@ -1415,6 +1497,14 @@ export function PosClient({
                   <div className="flex w-full items-end justify-between gap-1">
                     <span className="truncate text-sm font-semibold text-blue-700">
                       {money(priceFor(p, pricingMode))}
+                      {(p.offerDiscountPercent ?? 0) > 0 && (
+                        <span
+                          className="ms-1 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold uppercase text-emerald-700"
+                          title={p.offerName || "Discount offer"}
+                        >
+                          -{p.offerDiscountPercent}%
+                        </span>
+                      )}
                       {pricingMode === "wholesale" && wholesalePriceOf(p) <= 0 && (
                         <span className="ms-1 text-[10px] font-normal text-red-500">no wholesale</span>
                       )}
@@ -1611,6 +1701,14 @@ export function PosClient({
                           {line.itemType === "direct" && (
                             <span className="ms-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-700">
                               Direct
+                            </span>
+                          )}
+                          {(line.offerPercent ?? 0) > 0 && (
+                            <span
+                              className="ms-1 shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-700"
+                              title={line.offerName || "Discount offer"}
+                            >
+                              {line.offerPercent}% offer
                             </span>
                           )}
                         </p>
@@ -1898,6 +1996,37 @@ export function PosClient({
         <div className="space-y-4">
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[200px] flex-1">
+              <FormField
+                label="Scan a product barcode"
+                hint="Opens the newest returnable sale for that product; the item is added back with the price actually paid"
+              >
+                <div className="relative">
+                  <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    data-testid="refund-barcode"
+                    value={refundScan}
+                    onChange={(e) => setRefundScan(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void scanRefundProduct();
+                      }
+                    }}
+                    placeholder="Scan barcode or type SKU"
+                    className="w-full rounded-lg border border-slate-300 py-2 pe-3 ps-9 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              </FormField>
+            </div>
+            <Button variant="secondary" loading={refundLookupLoading} onClick={scanRefundProduct} data-testid="refund-scan">
+              Add scanned item
+            </Button>
+          </div>
+          {refundScanNote && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{refundScanNote}</p>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[200px] flex-1">
               <FormField label="Original receipt / invoice number" required>
                 <Input
                   data-testid="refund-invoice"
@@ -1955,6 +2084,14 @@ export function PosClient({
                             )}
                           </p>
                           <p className="text-xs text-slate-400">{money(line.sellingPrice)} · {line.sku}</p>
+                          <p className="text-xs font-medium text-emerald-700">
+                            Refund {money(line.unitRefund ?? line.sellingPrice)} per unit
+                          </p>
+                          {(line.discountApplied ?? 0) > 0 && (
+                            <p className="text-[10px] text-amber-600">
+                              Discount/benefit deducted: {money(line.discountApplied ?? 0)}
+                            </p>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right">{line.quantity}</td>
                         <td className="px-3 py-2 text-right">{line.returnedQuantity}</td>

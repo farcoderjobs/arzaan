@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SessionUser } from "@/lib/session";
 
 import { Table, EmptyState } from "@/components/ui/table";
-import { SearchInput, Button, Modal, Input, Select, Textarea, FormField, DatePicker } from "@/components/ui";
+import { SearchInput, Button, Modal, Input, Select, Textarea, FormField } from "@/components/ui";
 import { PageHeader, Breadcrumbs } from "@/components/layout";
 import { ConfirmDialog } from "@/components/ui/confirm";
 import { success, error } from "@/utils/toast";
@@ -28,10 +28,6 @@ type ProductRow = {
   sku: string;
   barcode?: string;
   barcodes?: Array<{ code: string; label: string }>;
-  expirationDate?: string | null;
-  variantName?: string;
-  parentProductId?: string | null;
-  parentName?: string;
   description?: string;
   categoryId?: string | { _id: string; name: string } | null;
   brandId?: string | { _id: string; name: string } | null;
@@ -71,8 +67,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     name: "",
     sku: "",
     barcode: "",
-    parentProductId: "",
-    variantName: "",
     categoryId: "",
     brandId: "",
     departmentId: "",
@@ -84,7 +78,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     discount: "",
     minimumStock: "",
     description: "",
-    expirationDate: "",
     status: "active" as ProductStatus,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -94,7 +87,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
   const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
   const [brands, setBrands] = useState<{ _id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
-  const [parentProducts, setParentProducts] = useState<Array<{ _id: string; name: string; variantName?: string }>>([]);
   const [filterLoading, setFilterLoading] = useState(false);
 
   // Barcode management (multiple barcodes per product, unique across variants)
@@ -108,21 +100,16 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
 
   const loadFilters = useCallback(async () => {
     try {
-      const [catRes, brandRes, deptRes, prodRes] = await Promise.all([
+      const [catRes, brandRes, deptRes] = await Promise.all([
         fetch("/api/categories"),
         fetch("/api/brands"),
         fetch("/api/departments?all=1"),
-        fetch("/api/products?perPage=100&status=active"),
       ]);
       if (catRes.ok) setCategories(await catRes.json());
       if (brandRes.ok) setBrands(await brandRes.json());
       if (deptRes.ok) {
         const data = await deptRes.json();
         setDepartments(data.departments ?? []);
-      }
-      if (prodRes.ok) {
-        const data = await prodRes.json();
-        setParentProducts(data.products ?? []);
       }
     } catch {
       // ignore
@@ -172,8 +159,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       name: "",
       sku: "",
       barcode: "",
-      parentProductId: "",
-      variantName: "",
       categoryId: "",
       brandId: "",
       departmentId: "",
@@ -185,7 +170,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       discount: "",
       minimumStock: "",
       description: "",
-      expirationDate: "",
       status: "active",
     });
     setFormErrors({});
@@ -198,8 +182,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       name: product.name ?? "",
       sku: product.sku ?? "",
       barcode: product.barcode ?? "",
-      parentProductId: product.parentProductId ?? "",
-      variantName: product.variantName ?? "",
       categoryId: product.categoryId?.toString() ?? "",
       brandId: product.brandId?.toString() ?? "",
       departmentId:
@@ -214,7 +196,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       discount: product.discount?.toString() ?? "",
       minimumStock: product.reorderPoint?.toString() ?? "",
       description: product.description ?? "",
-      expirationDate: product.expirationDate ? product.expirationDate.slice(0, 10) : "",
       status: (product.status ?? "active") as ProductStatus,
     });
     setFormErrors({});
@@ -249,8 +230,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
         name: form.name.trim(),
         sku: form.sku.trim().toUpperCase(),
         barcode: form.barcode.trim().toUpperCase(),
-        parentProductId: form.parentProductId || null,
-        variantName: form.variantName.trim(),
         categoryId: form.categoryId || null,
         brandId: form.brandId || null,
         departmentId: form.departmentId || null,
@@ -262,7 +241,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
         discount: form.discount ? Number(form.discount) : 0,
         minimumStock: form.minimumStock ? Number(form.minimumStock) : 0,
         description: form.description.trim(),
-        expirationDate: form.expirationDate || null,
         status: form.status,
       };
       const res = await fetch("/api/products", {
@@ -619,9 +597,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                 <h3 className="text-lg font-semibold text-slate-900">{selected.name}</h3>
                 <p className="text-sm text-slate-500">{selected.sku}</p>
                 {selected.barcode && <p className="text-sm text-slate-500">Barcode: {selected.barcode}</p>}
-                {selected.variantName && (
-                  <p className="text-sm text-slate-500">Variant: {selected.variantName}</p>
-                )}
                 {(selected.barcodes ?? []).length > 0 && (
                   <p className="text-sm text-slate-500">
                     Other barcodes: {(selected.barcodes ?? []).map((b) => b.code).join(", ")}
@@ -650,7 +625,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                   <p className="text-slate-600">Purchase source: <span className="font-medium text-slate-900">{selected.purchaseSource === "import" ? "Import (China)" : selected.purchaseSource === "local" ? "Local" : "Not set"}</span></p>
                   <p className="text-slate-600">Status: {statusBadge(selected.status ?? "inactive")}</p>
                   <p className="text-slate-600">Min stock: <span className="font-medium text-slate-900">{selected.reorderPoint ?? 0}</span></p>
-                  <p className="text-slate-600">Expiration: <span className="font-medium text-slate-900">{selected.expirationDate ? new Date(selected.expirationDate).toLocaleDateString() : "None"}</span></p>
                 </div>
               </div>
             </div>
@@ -697,29 +671,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                   onChange={(v) => setForm({ ...form, categoryId: v })}
                   options={categories.map((c) => ({ value: c._id, label: c.name }))}
                   placeholder="Select category"
-                />
-              </FormField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                label="Variant of"
-                hint="Leave empty for a standalone product. A variant keeps its own SKU, barcodes, price and stock."
-              >
-                <Select
-                  value={form.parentProductId}
-                  onChange={(v) => setForm({ ...form, parentProductId: v })}
-                  options={parentProducts
-                    .filter((p) => p._id !== selected?._id)
-                    .map((p) => ({ value: p._id, label: p.variantName ? `${p.name} — ${p.variantName}` : p.name }))}
-                  placeholder="Standalone product"
-                />
-              </FormField>
-              <FormField label="Variant name" hint="e.g. Vanilla 500g, Large, 12-pack">
-                <Input
-                  value={form.variantName}
-                  onChange={(e) => setForm({ ...form, variantName: e.target.value })}
-                  placeholder="Variant name (optional)"
                 />
               </FormField>
             </div>
@@ -819,19 +770,6 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
                   value={form.discount}
                   onChange={(e) => setForm({ ...form, discount: e.target.value })}
                   placeholder="0"
-                />
-              </FormField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                label="Expiration Date"
-                hint="Optional. Purchase batches can each carry their own expiry date."
-              >
-                <Input
-                  type="date"
-                  value={form.expirationDate}
-                  onChange={(e) => setForm({ ...form, expirationDate: e.target.value })}
                 />
               </FormField>
             </div>

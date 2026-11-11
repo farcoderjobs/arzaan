@@ -11,6 +11,12 @@ export type PricingItemInput = {
   quantity: number;
   /** Discount for the line: absolute amount when discountType is "amount", percent 0-100 otherwise. */
   unitDiscount: number;
+  /**
+   * Automatic offer discount resolved from active DiscountOffer documents.
+   * Always a percentage of the line, added to the manual line discount and to
+   * the sale-level discount. Never counted as a cashier discount.
+   */
+  offerDiscountPercent?: number;
 };
 
 export type SalePricingMode = "retail" | "wholesale";
@@ -117,10 +123,15 @@ export function computeSaleTotals(
         : product.sellingPrice;
 
     const gross = round2(basePrice * item.quantity);
-    const lineDiscount =
+    const manualDiscount =
       discountType === "percent"
         ? round2((gross * Math.min(item.unitDiscount, MAX_DISCOUNT_PERCENT)) / 100)
         : round2(Math.min(item.unitDiscount, gross));
+    // Automatic offer discount is always a percentage of the line value and is
+    // deducted before tax, exactly like a manual line discount.
+    const offerPercent = Math.min(Math.max(0, item.offerDiscountPercent ?? 0), MAX_DISCOUNT_PERCENT);
+    const offerDiscount = round2((gross * offerPercent) / 100);
+    const lineDiscount = round2(Math.min(gross, manualDiscount + offerDiscount));
     const net = round2(gross - lineDiscount);
     const lineTax = round2((net * product.taxRate) / 100);
 

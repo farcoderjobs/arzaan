@@ -63,6 +63,9 @@ type SaleWithLines = {
   paymentMethod: string | null;
   payments: Array<{ method: string; amount: number }>;
   items: Array<ISaleItemSnapshot & { _id?: mongoose.Types.ObjectId }>;
+  subtotal: number;
+  /** Includes line discounts plus sale-level discount and employee benefit. */
+  discount: number;
   total: number;
   bonusEarned: number;
   bonusRedeemed?: number;
@@ -70,6 +73,41 @@ type SaleWithLines = {
 
 function lineIdOf(line: ISaleItemSnapshot & { _id?: mongoose.Types.ObjectId }): string {
   return line._id ? line._id.toString() : `${line.productId ?? "direct"}:${line.sku}:${line.name}`;
+}
+
+export type RefundableLine = { subtotal: number; tax: number; discount: number; quantity: number };
+export type RefundableSale = { subtotal: number; discount: number; items: RefundableLine[] };
+
+/**
+ * What the customer actually paid for one sale line (all of its quantity).
+ *
+ * A line snapshot's `subtotal` already nets that line's own discount, but a
+ * sale-level discount and the employer-funded employee benefit only exist on
+ * the sale. Refunding the raw subtotal would hand back more than was paid, so
+ * the extra discount is prorated over each line's net (pre-tax) value — which
+ * keeps the deduction attached to that specific product.
+ */
+export function lineRefundValue(
+  sale: RefundableSale,
+  line: RefundableLine
+): { paid: number; discountApplied: number } {
+  const lineDiscountTotal = round2(
+    (sale.items ?? []).reduce((sum, item) => sum + (item.discount ?? 0), 0)
+  );
+  const extraDiscount = round2(Math.max(0, (sale.discount ?? 0) - lineDiscountTotal));
+  const netBase = round2((sale.subtotal ?? 0) - lineDiscountTotal);
+  const lineNet = round2((line.subtotal ?? 0) - (line.tax ?? 0));
+  const share = netBase > 0 ? Math.max(0, Math.min(1, lineNet / netBase)) : 0;
+  const discountApplied = round2(Math.min(line.subtotal ?? 0, extraDiscount * share));
+  return { paid: round2((line.subtotal ?? 0) - discountApplied), discountApplied };
+}
+
+/** Refund owed for `quantity` returned units of one sale line. */
+export function refundForQuantity(sale: RefundableSale, line: RefundableLine, quantity: number): number {
+  if (!Number.isFinite(quantity) || quantity <= 0 || line.quantity <= 0) return 0;
+  const { paid } = lineRefundValue(sale, line);
+  if (quantity >= line.quantity) return paid;
+  return round2((paid * quantity) / line.quantity);
 }
 
 /**
@@ -153,8 +191,9 @@ export async function buildReturnItems(
 
     const item = target.line;
     // Snapshot from the ORIGINAL sale — price the customer actually paid,
-    // including wholesale pricing, discounts and tax.
-    const lineTotal = round2(item.subtotal * (request.quantity / item.quantity));
+    // including wholesale pricing, line/sale discounts, tax and any employee
+    // benefit. Refunding the raw subtotal would return more than was paid.
+    const lineTotal = refundForQuantity(sale, item, request.quantity);
     const isInventory = (item.itemType ?? "inventory") === "inventory" && Boolean(item.productId);
     result.push({
       productId: item.productId ?? null,

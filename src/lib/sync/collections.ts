@@ -23,6 +23,7 @@ export const SYNC_COLLECTION_PRIORITY: Record<string, number> = {
   brands: 30,
   storeproducts: 35,
   products: 40,
+  discountoffers: 45,
   customers: 40,
   suppliers: 40,
   purchases: 50,
@@ -69,6 +70,7 @@ export const SYNC_PULL_COLLECTIONS: string[] = [
   "brands",
   "storeproducts",
   "products",
+  "discountoffers",
   "customers",
   "suppliers",
 ];

@@ -28,6 +28,7 @@ import {
 } from "@/lib/commerce";
 import { allocateQuantity, sellableQuantity, expiredQuantity } from "@/lib/expiry";
 import { getProductBatches } from "@/lib/inventory-batches";
+import { resolveOfferDiscountsForProducts } from "@/lib/discounts";
 import { appendLedgerEntry } from "@/lib/customer-ledger";
 import { appendBonusEntry, expireCustomerBonus } from "@/lib/bonus";
 import { generateDocumentNumber } from "@/lib/document-number";
@@ -329,11 +330,15 @@ export async function prepareSale(
     }
   }
 
-  // 3. Server recalculates every total — client values are ignored
+  // 3. Server recalculates every total — client values are ignored. Active
+  // discount offers are resolved here (never trusted from the payload), so the
+  // percentage charged is the one running at checkout.
+  const offerDiscounts = await resolveOfferDiscountsForProducts(productIds, { session });
   const pricingInputs = input.items.map((item) => ({
     productId: item.productId,
     quantity: item.quantity,
     unitDiscount: item.unitDiscount,
+    offerDiscountPercent: offerDiscounts.get(item.productId)?.percentage ?? 0,
   }));
   let inventoryTotals: ReturnType<typeof computeSaleTotals>;
   try {

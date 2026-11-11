@@ -37,10 +37,24 @@ export async function GET(req: NextRequest) {
     const categoryId = searchParams.get("categoryId")?.trim() ?? "";
 
     const branchMatch = user.branchId ? { branchId: new mongoose.Types.ObjectId(user.branchId) } : {};
-    const movementBranchMatch = user.branchId ? { branchId: new mongoose.Types.ObjectId(user.branchId) } : {};
+    const branchObjectId = user.branchId ? new mongoose.Types.ObjectId(user.branchId) : null;
+
+    // Shop quantity is scoped to the user's shop (every shop for HQ users);
+    // warehouse quantity always covers every warehouse, because warehouse stock
+    // is reserve that the shop needs to see even though the POS cannot sell it.
+    const shopCondition = branchObjectId
+      ? { $and: [{ $ne: ["$m.branchId", null] }, { $eq: ["$m.branchId", branchObjectId] }] }
+      : { $ne: ["$m.branchId", null] };
+    const warehouseCondition = { $ne: ["$m.warehouseId", null] };
+    // Total stock stays scoped to the user's shop (plus every warehouse) so a
+    // branch-scoped manager never sees another shop's units in the total.
+    const stockCondition = branchObjectId
+      ? { $or: [{ $eq: ["$m.branchId", branchObjectId] }, warehouseCondition] }
+      : { $literal: true };
 
     // Stock-level aggregation per product (with product metadata).
-    // Movements are unwound first, signed, then summed per product.
+    // Movements are unwound first, signed, then summed per product — split by
+    // shop and warehouse so both are visible side by side.
     const stockBase: mongoose.PipelineStage[] = [
       { $match: { status: { $ne: "archived" }, ...(categoryId ? { categoryId: new mongoose.Types.ObjectId(categoryId) } : {}), ...(search ? { $or: [{ name: new RegExp(escapeRegex(search), "i") }, { sku: new RegExp(escapeRegex(search), "i") }] } : {}) } },
       {
@@ -49,8 +63,8 @@ export async function GET(req: NextRequest) {
           as: "m",
           let: { pid: "$_id" },
           pipeline: [
-            { $match: { $expr: { $eq: ["$productId", "$$pid"] }, ...movementBranchMatch } },
-            { $project: { movementType: 1, quantity: 1 } },
+            { $match: { $expr: { $eq: ["$productId", "$$pid"] } } },
+            { $project: { movementType: 1, quantity: 1, branchId: 1, warehouseId: 1 } },
           ],
         },
       },
@@ -74,9 +88,38 @@ export async function GET(req: NextRequest) {
           costPrice: { $first: "$costPrice" },
           sellingPrice: { $first: "$sellingPrice" },
           reorderPoint: { $first: "$reorderPoint" },
-          stock: { $sum: "$signedQty" },
+          stock: { $sum: { $cond: [stockCondition, "$signedQty", 0] } },
+          shopStock: { $sum: { $cond: [shopCondition, "$signedQty", 0] } },
+          warehouseStock: { $sum: { $cond: [warehouseCondition, "$signedQty", 0] } },
         },
       },
+      // Unit price actually paid on the most recent receipt, so the report shows
+      // the purchased cost of what is on hand (falls back to the product's cost).
+      {
+        $lookup: {
+          from: "inventorymovements",
+          as: "lastPurchase",
+          let: { pid: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [{ $eq: ["$productId", "$$pid"] }, { $eq: ["$movementType", "PURCHASE_IN"] }],
+                },
+              },
+            },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            { $project: { unitCost: 1 } },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          unitPrice: { $ifNull: [{ $arrayElemAt: ["$lastPurchase.unitCost", 0] }, "$costPrice"] },
+        },
+      },
+      { $project: { lastPurchase: 0 } },
     ];
 
     if (view === "movements") {
@@ -120,8 +163,8 @@ export async function GET(req: NextRequest) {
       }));
 
       if (searchParams.get("format") === "csv") {
-        const csvRows: Array<Array<string | number>> = [["Date", "Product", "SKU", "Movement", "Quantity", "Unit Cost", "Note"]];
-        for (const r of rows) csvRows.push([r.createdAt.toISOString(), r.productName, r.sku, r.movementType, r.quantity, r.unitCost, r.note]);
+        const csvRows: Array<Array<string | number>> = [["Date", "Product", "SKU", "Movement", "Quantity", "Unit Cost"]];
+        for (const r of rows) csvRows.push([r.createdAt.toISOString(), r.productName, r.sku, r.movementType, r.quantity, r.unitCost]);
         return csvResponse(`stock-movements-${new Date().toISOString().slice(0, 10)}.csv`, csvRows);
       }
 
@@ -179,8 +222,8 @@ export async function GET(req: NextRequest) {
       }));
 
       if (searchParams.get("format") === "csv") {
-        const csvRows: Array<Array<string | number>> = [["Date", "Product", "SKU", "Adjustment", "Quantity", "Unit Cost", "Note"]];
-        for (const r of rows) csvRows.push([r.createdAt.toISOString(), r.productName, r.sku, r.movementType, r.quantity, r.unitCost, r.note]);
+        const csvRows: Array<Array<string | number>> = [["Date", "Product", "SKU", "Adjustment", "Quantity", "Unit Cost"]];
+        for (const r of rows) csvRows.push([r.createdAt.toISOString(), r.productName, r.sku, r.movementType, r.quantity, r.unitCost]);
         return csvResponse(`inventory-adjustments-${new Date().toISOString().slice(0, 10)}.csv`, csvRows);
       }
 
@@ -229,6 +272,9 @@ export async function GET(req: NextRequest) {
       name: p.name,
       sku: p.sku ?? "",
       stock: p.stock ?? 0,
+      shopStock: p.shopStock ?? 0,
+      warehouseStock: p.warehouseStock ?? 0,
+      unitPrice: p.unitPrice ?? p.costPrice ?? 0,
       reorderPoint: p.reorderPoint ?? 0,
       costPrice: p.costPrice ?? 0,
       sellingPrice: p.sellingPrice ?? 0,
@@ -239,12 +285,14 @@ export async function GET(req: NextRequest) {
     if (searchParams.get("format") === "csv") {
       const header =
         view === "valuation"
-          ? [["Product", "SKU", "Stock", "Cost Price", "Unit Selling Price", "Stock Value", "Retail Value"]]
-          : [["Product", "SKU", "Stock", "Reorder Point", "Cost Price", "Unit Selling Price"]];
+          ? [["Product", "SKU", "Shop", "Warehouse", "Total Stock", "Unit Purchase Price", "Cost Price", "Unit Selling Price", "Stock Value", "Retail Value"]]
+          : [["Product", "SKU", "Shop", "Warehouse", "Total Stock", "Unit Purchase Price", "Reorder Point", "Cost Price", "Unit Selling Price"]];
       const csvRows = [...header];
       for (const r of rows) {
-        if (view === "valuation") csvRows.push([r.name, r.sku, r.stock, r.costPrice, r.sellingPrice, r.value, r.retailValue]);
-        else csvRows.push([r.name, r.sku, r.stock, r.reorderPoint, r.costPrice, r.sellingPrice]);
+        if (view === "valuation")
+          csvRows.push([r.name, r.sku, r.shopStock, r.warehouseStock, r.stock, r.unitPrice, r.costPrice, r.sellingPrice, r.value, r.retailValue]);
+        else
+          csvRows.push([r.name, r.sku, r.shopStock, r.warehouseStock, r.stock, r.unitPrice, r.reorderPoint, r.costPrice, r.sellingPrice]);
       }
       return csvResponse(`inventory-${view}-${new Date().toISOString().slice(0, 10)}.csv`, csvRows);
     }

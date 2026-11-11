@@ -8,6 +8,7 @@ import {
   SupplierTransaction,
   Payment,
   User,
+  Warehouse,
 } from "@/models";
 import { requireSessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/authorization";
@@ -39,6 +40,13 @@ const createPurchaseSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
   /** Import (China) stock is owner/manager-controlled; Local is the default. */
   purchaseSource: z.enum(["import", "local"]).default("local"),
+  /**
+   * Where the received stock lands: the shop (sellable at the POS) or a
+   * warehouse (reserve that only transfers into a shop later).
+   */
+  locationType: z.enum(["shop", "warehouse"]).default("shop"),
+  /** Required when locationType is "warehouse". */
+  warehouseId: z.string().nullable().optional(),
   /** Department (mini-store) the local stock is bought for; null = the shop. */
   departmentId: z.string().nullable().optional(),
   items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
@@ -77,6 +85,7 @@ export async function GET(req: NextRequest) {
     const total = await Purchase.countDocuments(query);      const purchases = await Purchase.find(query)
       .populate<{ supplierId: { name: string } }>("supplierId", "name")
       .populate<{ createdBy: { name: string } }>("createdBy", "name")
+      .populate<{ warehouseId: { name: string } }>("warehouseId", "name")
       .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
@@ -87,6 +96,7 @@ export async function GET(req: NextRequest) {
         ...p,
         supplierId: p.supplierId as { _id: string; name: string } | null,
         createdBy: p.createdBy as { _id: string; name: string } | null,
+        warehouseName: (p.warehouseId as { name?: string } | null)?.name ?? null,
       })),
       total,
       page,
@@ -160,6 +170,25 @@ export async function POST(req: NextRequest) {
         departmentName = department.name;
       }
 
+      // Warehouse receipts are recorded against the warehouse only — never the
+      // shop's branch — so the POS never offers (or sells) reserve stock.
+      let destinationWarehouseId: mongoose.Types.ObjectId | null = null;
+      let receiveInto = "Shop";
+      if (data.locationType === "warehouse") {
+        if (!data.warehouseId || !mongoose.Types.ObjectId.isValid(data.warehouseId)) {
+          return NextResponse.json(badRequest("Select the warehouse that receives this purchase"), {
+            status: 400,
+          });
+        }
+        const warehouse = await Warehouse.findById(data.warehouseId).select("name status").lean();
+        if (!warehouse) return NextResponse.json(notFound("Warehouse not found"), { status: 404 });
+        if (warehouse.status !== "active") {
+          return NextResponse.json(badRequest("The selected warehouse is inactive"), { status: 400 });
+        }
+        destinationWarehouseId = warehouse._id;
+        receiveInto = warehouse.name;
+      }
+
       // Fetch products and snapshot names/prices
       const productIds = data.items.map((item) => item.productId);
       const products = await Product.find({ _id: { $in: productIds } }).lean<Array<{ _id: unknown; name: string; sku: string; sellingPrice: number }>>();
@@ -223,6 +252,8 @@ export async function POST(req: NextRequest) {
         supplierId: data.supplierId,
         branchId: supplier.branchId ?? null,
         purchaseSource: data.purchaseSource,
+        locationType: destinationWarehouseId ? "warehouse" : "shop",
+        warehouseId: destinationWarehouseId,
         departmentId,
         departmentName,
         status: "pending",
@@ -242,7 +273,8 @@ export async function POST(req: NextRequest) {
       for (const item of itemsWithSnapshot) {
         await InventoryMovement.create({
           productId: item.productId,
-          branchId: purchase.branchId ?? null,
+          branchId: destinationWarehouseId ? null : purchase.branchId ?? null,
+          warehouseId: destinationWarehouseId,
           movementType: "PURCHASE_IN",
           quantity: item.quantity,
           unitCost: item.purchasePrice,
@@ -318,7 +350,7 @@ export async function POST(req: NextRequest) {
         action: "purchase.create",
         entityType: "Purchase",
         entityId: purchase._id.toString(),
-        newValue: { purchaseNumber: purchase.purchaseNumber, total, supplierId: data.supplierId, purchaseSource: purchase.purchaseSource, departmentName, items: itemsWithSnapshot.length },
+        newValue: { purchaseNumber: purchase.purchaseNumber, total, supplierId: data.supplierId, purchaseSource: purchase.purchaseSource, receiveInto, locationType: data.locationType, departmentName, items: itemsWithSnapshot.length },
         branchId: purchase.branchId?.toString(),
         ...meta,
       });
@@ -350,7 +382,8 @@ export async function POST(req: NextRequest) {
         for (const item of purchase.items) {
           await InventoryMovement.create({
             productId: item.productId,
-            branchId: purchase.branchId,
+            branchId: purchase.warehouseId ? null : purchase.branchId,
+            warehouseId: purchase.warehouseId ?? null,
             movementType: "SUPPLIER_RETURN_OUT",
             quantity: item.quantity,
             unitCost: item.purchasePrice,
@@ -386,7 +419,8 @@ export async function POST(req: NextRequest) {
       for (const item of purchase.items) {
         await InventoryMovement.create({
           productId: item.productId,
-          branchId: purchase.branchId,
+          branchId: purchase.warehouseId ? null : purchase.branchId,
+          warehouseId: purchase.warehouseId ?? null,
           movementType: "SUPPLIER_RETURN_OUT",
           quantity: item.quantity,
           unitCost: item.purchasePrice,

@@ -7,6 +7,12 @@ interface StockRow {
   name: string;
   sku: string;
   stock: number;
+  /** Units on hand in the shop(s). */
+  shopStock: number;
+  /** Units on hand in warehouses. */
+  warehouseStock: number;
+  /** Unit price paid on the most recent purchase receipt. */
+  unitPrice: number;
   reorderPoint: number;
   costPrice: number;
   sellingPrice: number;
@@ -20,7 +26,6 @@ interface MovementRow {
   movementType: string;
   quantity: number;
   unitCost: number;
-  note: string;
   productName: string;
   sku: string;
   userName: string;
@@ -41,7 +46,7 @@ export function InventoryReportClient() {
   return (
     <ReportShell<StockRow | MovementRow>
       title="Inventory Report"
-      description="Stock levels, valuation, movements and adjustments"
+      description="Stock levels in the shop and the warehouse, valuation and movements"
       endpoint="/api/reports/inventory"
       viewParam="view"
       defaultView="stock"
@@ -81,7 +86,7 @@ export function InventoryReportClient() {
             </div>
           );
         } },
-        { key: "stock", header: "Stock", align: "right", render: (r) => {
+        { key: "stock", header: "Total Stock", align: "right", render: (r) => {
           const m = r as MovementRow;
           if (isMovement(String(m.movementType ?? ""))) {
             return <span className={m.quantity < 0 ? "text-red-600" : "text-green-700"}>{m.quantity > 0 ? "+" : ""}{m.quantity}</span>;
@@ -89,17 +94,19 @@ export function InventoryReportClient() {
           const s = r as StockRow;
           return <span className={s.stock <= 0 ? "font-semibold text-red-600" : s.stock <= s.reorderPoint ? "font-semibold text-amber-600" : ""}>{s.stock}</span>;
         } },
-        { key: "createdAt", header: "Date", render: (r) => {
-          const m = r as MovementRow;
-          return isMovement(String(m.movementType ?? ""))
-            ? new Date(m.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-            : "—";
+        { key: "shopStock", header: "In Shop", align: "right", render: (r) => {
+          // Only shop stock can be sold from the POS; warehouse units are reserve.
+          return isMovement(String((r as MovementRow).movementType ?? "")) ? "—" : String((r as StockRow).shopStock ?? 0);
         } },
-        { key: "note", header: "Note", render: (r) => {
-          const m = r as MovementRow;
-          return isMovement(String(m.movementType ?? "")) ? (m.note || "—") : "—";
+        { key: "warehouseStock", header: "In Warehouse", align: "right", render: (r) => {
+          return isMovement(String((r as MovementRow).movementType ?? "")) ? "—" : String((r as StockRow).warehouseStock ?? 0);
         } },
-        { key: "userName", header: "By", render: (r) => (r as MovementRow).userName ?? "—" },
+        { key: "unitPrice", header: "Unit Price (purchase)", align: "right", render: (r) => {
+          if (isMovement(String((r as MovementRow).movementType ?? ""))) {
+            return money((r as MovementRow).unitCost ?? 0);
+          }
+          return money((r as StockRow).unitPrice ?? 0);
+        } },
         { key: "sellingPrice", header: "Unit Selling Price", align: "right", render: (r) => {
           const s = r as StockRow;
           // Variants are separate product rows, so this is always the actual
@@ -110,6 +117,13 @@ export function InventoryReportClient() {
           const s = r as StockRow;
           return !isMovement(String((r as MovementRow).movementType ?? "")) ? money(s.value) : "—";
         } },
+        { key: "createdAt", header: "Date", render: (r) => {
+          const m = r as MovementRow;
+          return isMovement(String(m.movementType ?? ""))
+            ? new Date(m.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+            : "—";
+        } },
+        { key: "userName", header: "By", render: (r) => (r as MovementRow).userName ?? "—" },
       ]}
     />
   );

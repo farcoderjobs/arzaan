@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import mongoose from "mongoose";
 import { getProductBatches } from "@/lib/inventory-batches";
 import { expiredQuantity, sellableQuantity } from "@/lib/expiry";
+import { resolveOfferDiscountsForProducts } from "@/lib/discounts";
 
 /**
  * POS product lookup — optimized for barcode scanners and fast search.
@@ -54,6 +55,11 @@ export async function GET(req: NextRequest) {
       const stock = await getStock(product._id.toString(), user.branchId);
       const batches = await getProductBatches([product._id.toString()], user.branchId);
       const productBatches = batches.get(product._id.toString()) ?? [];
+      // The scanned product carries the offer running today (if any) so the
+      // cashier sees the same price the server will charge.
+      const offer = (await resolveOfferDiscountsForProducts([product._id.toString()])).get(
+        product._id.toString()
+      );
       return NextResponse.json({
         product: {
           ...product,
@@ -62,6 +68,8 @@ export async function GET(req: NextRequest) {
           // is surfaced so the POS can warn before adding it to the cart.
           expiredQty: expiredQuantity(productBatches),
           sellableQty: sellableQuantity(productBatches),
+          offerDiscountPercent: offer?.percentage ?? 0,
+          offerName: offer?.name ?? "",
         },
       });
     }
@@ -130,8 +138,17 @@ export async function GET(req: NextRequest) {
       { $project: { movements: 0 } },
     ]);
 
+    // Attach the active offer percentage to every card. The sales service
+    // resolves the same offers again at checkout, so the displayed discount and
+    // the charged discount cannot drift apart.
+    const offerMap = await resolveOfferDiscountsForProducts(products.map((p) => String(p._id)));
+    const productsWithOffers = products.map((p) => {
+      const offer = offerMap.get(String(p._id));
+      return { ...p, offerDiscountPercent: offer?.percentage ?? 0, offerName: offer?.name ?? "" };
+    });
+
     return NextResponse.json({
-      products,
+      products: productsWithOffers,
       categories: categories.map((c) => ({ _id: c._id.toString(), name: c.name })),
       total,
       page,

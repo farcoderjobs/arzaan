@@ -73,6 +73,7 @@ const ps: Dictionary = {
     pos: "پلورنځی",
     products: "محصولات",
     categories: "کټګورۍ",
+    discounts: "تخفیفونه",
     inventory: "زېرمه",
     purchases: "پیرودنې",
     customers: "پیرودونکي",

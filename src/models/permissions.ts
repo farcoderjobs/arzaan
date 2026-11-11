@@ -23,6 +23,10 @@ export const ALL_PERMISSIONS = [
   { name: "brands.update", description: "Update brands", category: "Brands" },
   { name: "brands.delete", description: "Delete brands", category: "Brands" },
 
+  // Discount offers
+  { name: "discounts.view", description: "View discount offers", category: "Discounts" },
+  { name: "discounts.manage", description: "Create, edit and stop discount offers", category: "Discounts" },
+
   // Inventory
   { name: "inventory.view", description: "View inventory", category: "Inventory" },
   { name: "inventory.adjust", description: "Adjust inventory", category: "Inventory" },
@@ -182,6 +186,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "transfers.receive",
     "transfers.cancel",
 
+    // Discount offers
+    "discounts.view",
+    "discounts.manage",
+
     // Inventory
     "inventory.view",
     "inventory.adjust",
@@ -315,6 +323,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "categories.create",
     "categories.update",
     "categories.delete",
+    "discounts.view",
+    "discounts.manage",
     "inventory.view",
     "inventory.adjust",
     "inventory.count",

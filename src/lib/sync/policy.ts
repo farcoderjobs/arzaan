@@ -69,6 +69,13 @@ export const COLLECTION_POLICY: Record<string, CollectionPolicy> = {
     appendOnly: false,
     stripFields: [],
   },
+  discountoffers: {
+    entityType: "DiscountOffer",
+    permissions: ["discounts.manage"],
+    centerAuthoritative: true,
+    appendOnly: false,
+    stripFields: [],
+  },
   employeesalaries: {
     entityType: "EmployeeSalary",
     permissions: ["payroll.manage"],

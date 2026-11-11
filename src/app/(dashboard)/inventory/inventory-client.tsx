@@ -108,7 +108,15 @@ export function InventoryClient({ user, initialExpiry = "" }: InventoryClientPro
   const [adjustForm, setAdjustForm] = useState({ quantity: "", type: "ADJUSTMENT_IN" as MovementType, reason: "", locationId: "" });
   const [adjustErrors, setAdjustErrors] = useState<Record<string, string>>({});
   const [adjusting, setAdjusting] = useState(false);
-  const [stats, setStats] = useState({ totalProducts: 0, lowStock: 0, outOfStock: 0, expired: 0, expiring: 0 });
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    lowStock: 0,
+    outOfStock: 0,
+    expired: 0,
+    expiring: 0,
+    shopUnits: 0,
+    warehouseUnits: 0,
+  });
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [locationFilter, setLocationFilter] = useState("");
 
@@ -135,7 +143,17 @@ export function InventoryClient({ user, initialExpiry = "" }: InventoryClientPro
       setTotal(data.total ?? 0);
       setProductTotal(data.productTotal ?? 0);
       setProductTotalPages(data.productTotalPages ?? 1);
-      setStats(data.stats ?? { totalProducts: 0, lowStock: 0, outOfStock: 0, expired: 0, expiring: 0 });
+      setStats(
+        data.stats ?? {
+          totalProducts: 0,
+          lowStock: 0,
+          outOfStock: 0,
+          expired: 0,
+          expiring: 0,
+          shopUnits: 0,
+          warehouseUnits: 0,
+        }
+      );
       setLocations(data.locations ?? []);
     } catch {
       error("Error", "Failed to load inventory");
@@ -475,7 +493,10 @@ export function InventoryClient({ user, initialExpiry = "" }: InventoryClientPro
       <div className="mt-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-slate-900">Stock Overview</h2>
-          <span className="text-sm text-slate-500">{productTotal} product{productTotal === 1 ? "" : "s"}</span>
+          <span className="text-sm text-slate-500">
+            {productTotal} product{productTotal === 1 ? "" : "s"} · {stats.shopUnits} units in shop ·{" "}
+            {stats.warehouseUnits} units in warehouse
+          </span>
         </div>
         <Table
           columns={[
@@ -521,6 +542,34 @@ export function InventoryClient({ user, initialExpiry = "" }: InventoryClientPro
                       </span>
                     )}
                   </div>
+                );
+              },
+            },
+            {
+              key: "shopStock",
+              header: "In Shop",
+              render: (row: StockRow) => {
+                // Only shop stock is sellable at the POS; warehouse units are
+                // reserve and stay out of the till until they are transferred.
+                const shop = (row.stockByLocation ?? [])
+                  .filter((l) => l.type !== "warehouse")
+                  .reduce((sum, l) => sum + (l.quantity ?? 0), 0);
+                return (
+                  <span className={cn("font-semibold", shop <= 0 ? "text-slate-400" : "text-slate-900")}>{shop}</span>
+                );
+              },
+            },
+            {
+              key: "warehouseStock",
+              header: "In Warehouse",
+              render: (row: StockRow) => {
+                const warehouse = (row.stockByLocation ?? [])
+                  .filter((l) => l.type === "warehouse")
+                  .reduce((sum, l) => sum + (l.quantity ?? 0), 0);
+                return (
+                  <span className={cn("font-semibold", warehouse <= 0 ? "text-slate-400" : "text-indigo-700")}>
+                    {warehouse}
+                  </span>
                 );
               },
             },

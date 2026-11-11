@@ -23,6 +23,11 @@ interface Purchase {
   purchaseNumber: string;
   supplierId: { _id: string; name: string } | null;
   purchaseSource?: "import" | "local";
+  /** Where the received stock landed: the shop or a warehouse. */
+  locationType?: "shop" | "warehouse";
+  warehouseId?: { _id?: string; name?: string } | string | null;
+  /** Populated by the API for warehouse receipts. */
+  warehouseName?: string | null;
   /** Department (mini-store) a local purchase was bought for; "Shop" is default. */
   departmentId?: string | null;
   departmentName?: string;
@@ -87,6 +92,9 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
     paymentMethod: "cash" | "card" | "transfer" | "check" | "account" | "other";
     paidAmount: number;
     note: string;
+    /** Receive into the shop (POS-sellable) or a warehouse (reserve stock). */
+    locationType: "shop" | "warehouse";
+    warehouseId: string;
   }>({
     supplierId: "",
     items: [emptyLine()],
@@ -95,12 +103,15 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
     paymentMethod: "cash" as "cash" | "card" | "transfer" | "check" | "account" | "other",
     paidAmount: 0,
     note: "",
+    locationType: "shop",
+    warehouseId: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [suppliers, setSuppliers] = useState<Array<{ _id: string; name: string }>>([]);
+  const [warehouses, setWarehouses] = useState<Array<{ _id: string; name: string }>>([]);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Print barcode (Purchases module)
@@ -141,6 +152,13 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
         try {
           const sRes = await fetch("/api/suppliers");
           if (sRes.ok) setSuppliers(await sRes.json());
+          const wRes = await fetch("/api/warehouses");
+          if (wRes.ok) {
+            const body = (await wRes.json()) as {
+              warehouses?: Array<{ _id: string; name: string; status?: string }>;
+            };
+            setWarehouses((body.warehouses ?? []).filter((w) => w.status !== "inactive"));
+          }
         } catch {
           // ignore
         }
@@ -194,6 +212,8 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
       paymentMethod: "cash",
       paidAmount: 0,
       note: "",
+      locationType: "shop",
+      warehouseId: "",
     });
     setErrors({});
     setModalOpen(true);
@@ -243,6 +263,9 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.supplierId) errs.supplierId = "Supplier is required";
+    if (form.locationType === "warehouse" && !form.warehouseId) {
+      errs.warehouseId = "Select the warehouse that receives this purchase";
+    }
     if (form.items.length === 0) errs.items = "At least one item is required";
     for (let i = 0; i < form.items.length; i++) {
       const item = form.items[i];
@@ -261,6 +284,8 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
       const payload = {
         action: "create",
         supplierId: form.supplierId,
+        locationType: form.locationType,
+        warehouseId: form.locationType === "warehouse" ? form.warehouseId : null,
         items: form.items.map((i) => ({
           productId: i.productId,
           quantity: Number(i.quantity),
@@ -398,6 +423,20 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
               : "Unspecified"}
         </span>
       ),
+    },
+    {
+      key: "destination",
+      header: "Received into",
+      render: (row: Purchase) =>
+        row.locationType === "warehouse" ? (
+          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+            {row.warehouseName
+              ?? (typeof row.warehouseId === "object" && row.warehouseId?.name)
+              ?? "Warehouse"}
+          </span>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Shop</span>
+        ),
     },
     {
       key: "items",
@@ -539,6 +578,39 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
               placeholder="Select supplier"
             />
           </FormField>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label="Receive into"
+              required
+              hint="Shop stock is sold at the POS; warehouse stock stays in reserve until transferred"
+            >
+              <Select
+                value={form.locationType}
+                onChange={(v) =>
+                  setForm({
+                    ...form,
+                    locationType: v as "shop" | "warehouse",
+                    warehouseId: v === "shop" ? "" : form.warehouseId,
+                  })
+                }
+                options={[
+                  { value: "shop", label: "Shop" },
+                  { value: "warehouse", label: "Warehouse" },
+                ]}
+              />
+            </FormField>
+            {form.locationType === "warehouse" && (
+              <FormField label="Warehouse" required error={errors.warehouseId}>
+                <Select
+                  value={form.warehouseId}
+                  onChange={(v) => setForm({ ...form, warehouseId: v })}
+                  options={warehouses.map((w) => ({ value: w._id, label: w.name }))}
+                  placeholder="Select warehouse"
+                />
+              </FormField>
+            )}
+          </div>
 
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -705,6 +777,14 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
                 <p className="font-medium text-slate-900">{selectedPurchase.supplierId?.name ?? "—"}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   Department: {selectedPurchase.departmentName || "Shop"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Received into:{" "}
+                  {selectedPurchase.locationType === "warehouse"
+                    ? selectedPurchase.warehouseName
+                      ?? (typeof selectedPurchase.warehouseId === "object" && selectedPurchase.warehouseId?.name)
+                      ?? "Warehouse"
+                    : "Shop"}
                 </p>
               </div>
               <div className="text-right">

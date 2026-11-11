@@ -19,11 +19,9 @@ const createSchema = z.object({
   barcode: z.string().optional(),
   /** Extra barcodes (flavours / packaging variants of the same sellable product). */
   barcodes: z.array(barcodeEntrySchema).max(50).optional(),
-  /** Optional product-level expiry (batches received by purchase override it). */
-  expirationDate: z.string().trim().nullable().optional(),
-  /** Variants are linked product rows with their own price and stock. */
-  parentProductId: z.string().trim().nullable().optional(),
-  variantName: z.string().trim().max(120).default(""),
+  // Expiry and variant fields belong to the Purchases module only: products are
+  // a single sellable catalog row, and each received batch carries its own
+  // expiry date.
   categoryId: z.string().optional().nullable(),
   brandId: z.string().optional().nullable(),
   /** Department that owns the product (sales are reported there). */
@@ -77,17 +75,6 @@ async function findBarcodeConflict(code: string, excludeId?: string) {
   };
   if (excludeId) query._id = { $ne: excludeId };
   return Product.findOne(query).select("name sku barcode").lean();
-}
-
-/**
- * Parses an optional date string. Absent/empty input → null (no date).
- * Returns undefined ONLY for an unparseable value so the caller can reject it.
- */
-function parseOptionalDate(value: string | null | undefined): Date | null | undefined {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date;
 }
 
 function duplicateKeyResponse(error: unknown): NextResponse | null {
@@ -194,10 +181,6 @@ export async function POST(req: NextRequest) {
     const isUpdate = Boolean(data.id);
     const now = new Date();
 
-    const expirationDate = parseOptionalDate(data.expirationDate);
-    if (expirationDate === undefined) {
-      return NextResponse.json(badRequest("Validation failed", { expirationDate: "Invalid date" }), { status: 400 });
-    }
     const barcodes = normalizeBarcodes(data.barcodes);
 
     if (!isUpdate) {
@@ -223,13 +206,6 @@ export async function POST(req: NextRequest) {
       const skuExists = await Product.findOne({ sku: data.sku });
       if (skuExists) {
         return NextResponse.json(badRequest("A product with this SKU already exists"), { status: 400 });
-      }
-
-      if (data.parentProductId) {
-        const parent = await Product.findById(data.parentProductId);
-        if (!parent) {
-          return NextResponse.json(badRequest("Parent product not found"), { status: 400 });
-        }
       }
 
       if (data.categoryId) {
@@ -260,9 +236,6 @@ export async function POST(req: NextRequest) {
         // path undefined omits the field and the sparse index skips it.
         barcode: data.barcode?.trim().toUpperCase() || undefined,
         barcodes,
-        expirationDate: expirationDate ?? null,
-        parentProductId: (data.parentProductId || null) as unknown as mongoose.Types.ObjectId | null,
-        variantName: data.variantName,
         categoryId: data.categoryId as unknown as mongoose.Types.ObjectId,
         brandId: (data.brandId || null) as unknown as mongoose.Types.ObjectId | null,
         departmentId: (data.departmentId || null) as unknown as mongoose.Types.ObjectId | null,
@@ -331,16 +304,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    if (data.parentProductId) {
-      if (data.parentProductId === product._id.toString()) {
-        return NextResponse.json(badRequest("A product cannot be its own variant parent"), { status: 400 });
-      }
-      const parent = await Product.findById(data.parentProductId);
-      if (!parent) {
-        return NextResponse.json(badRequest("Parent product not found"), { status: 400 });
-      }
-    }
-
     product.name = data.name.trim();
     product.sku = data.sku.trim().toUpperCase();
     // Same sparse-index rule as create: clearing the barcode unsets the field
@@ -349,9 +312,6 @@ export async function POST(req: NextRequest) {
     // Only touch the barcode list when the caller actually sent one — editing
     // name/price from the product form must not wipe extra barcodes.
     if (data.barcodes !== undefined) product.barcodes = barcodes;
-    product.expirationDate = expirationDate ?? null;
-    product.parentProductId = (data.parentProductId || null) as unknown as mongoose.Types.ObjectId | null;
-    product.variantName = data.variantName;
     product.categoryId = data.categoryId as unknown as mongoose.Types.ObjectId;
     product.brandId = (data.brandId || null) as unknown as mongoose.Types.ObjectId | null;
     product.departmentId = (data.departmentId || null) as unknown as mongoose.Types.ObjectId | null;

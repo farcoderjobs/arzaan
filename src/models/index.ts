@@ -282,6 +282,10 @@ export type IPurchaseItemSnapshot = {
 export type IPurchaseDocument = Document & {
   purchaseNumber: string;
   branchId: mongoose.Types.ObjectId;
+  /** Stock destination: the shop itself or a standalone warehouse. */
+  locationType: "shop" | "warehouse";
+  /** Warehouse that receives the stock when locationType is "warehouse". */
+  warehouseId: mongoose.Types.ObjectId | null;
   supplierId: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   /** Import (China) purchases follow manager-only rules; Local is open to buyers. */
@@ -636,6 +640,35 @@ export type IStoreOrderDocument = Document & {
   subtotal: number;
   total: number;
   status: StoreOrderStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/* ---------------------------------------------------------------------------
+ * Discount offers
+ *
+ * A time-boxed percentage offer targeted at departments, categories and/or
+ * individual products. Offers are resolved at sale time: the POS shows them and
+ * the sales service applies them server-side, so a refund always refunds what
+ * was actually paid. Only the highest matching offer percent applies to a line
+ * (offers never stack on the same product).
+ * ------------------------------------------------------------------------- */
+
+export type IDiscountOfferDocument = Document & {
+  name: string;
+  /** Whole/partial percentage taken off the line price (0–100). */
+  percentage: number;
+  /** First day the offer is active (00:00:00). */
+  startDate: Date;
+  /** Last day the offer is active (23:59:59.999). */
+  endDate: Date;
+  /** Multi-select targets; any match makes the offer apply to a product. */
+  departmentIds: mongoose.Types.ObjectId[];
+  categoryIds: mongoose.Types.ObjectId[];
+  productIds: mongoose.Types.ObjectId[];
+  status: "active" | "inactive";
+  note: string;
+  createdBy: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -1037,6 +1070,27 @@ export const BrandSchema = new Schema<IBrandDocument>(
 
 BrandSchema.index({ name: 1 }, { unique: true });
 
+export const DiscountOfferSchema = new Schema<IDiscountOfferDocument>(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    percentage: { type: Number, required: true, min: 0.01, max: 100 },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    departmentIds: { type: [{ type: Schema.Types.ObjectId, ref: "Department" }], default: [] },
+    categoryIds: { type: [{ type: Schema.Types.ObjectId, ref: "Category" }], default: [] },
+    productIds: { type: [{ type: Schema.Types.ObjectId, ref: "Product" }], default: [] },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    note: { type: String, default: "", trim: true, maxlength: 300 },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true }
+);
+
+DiscountOfferSchema.index({ status: 1, startDate: 1, endDate: 1 });
+DiscountOfferSchema.index({ productIds: 1 });
+DiscountOfferSchema.index({ categoryIds: 1 });
+DiscountOfferSchema.index({ departmentIds: 1 });
+
 export const ProductSchema = new Schema<IProductDocument>(
   {
     name: { type: String, required: true, trim: true },
@@ -1231,6 +1285,11 @@ export const PurchaseSchema = new Schema<IPurchaseDocument>(
   {
     // null = HQ purchase (supplier without a branch) — see InventoryMovementSchema.
     branchId: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
+    // Received stock goes to the shop (branch) by default, or to a warehouse.
+    // Warehouse receipts carry `warehouseId` on every inventory movement and
+    // never `branchId`, so the POS (shop-scoped) does not see or sell them.
+    locationType: { type: String, enum: ["shop", "warehouse"], default: "shop" },
+    warehouseId: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
     supplierId: { type: Schema.Types.ObjectId, ref: "Supplier", required: true },
     purchaseNumber: { type: String, required: true, trim: true },
     // Defaults to local so purchases created by older clients stay valid.
@@ -1278,6 +1337,7 @@ export const PurchaseSchema = new Schema<IPurchaseDocument>(
 
 PurchaseSchema.index({ purchaseNumber: 1 }, { unique: true });
 PurchaseSchema.index({ branchId: 1, createdAt: -1 });
+PurchaseSchema.index({ warehouseId: 1, createdAt: -1 });
 PurchaseSchema.index({ supplierId: 1 });
 PurchaseSchema.index({ userId: 1 });
 PurchaseSchema.index({ status: 1 });
@@ -2270,6 +2330,7 @@ const REPLICATED_SCHEMAS: Schema[] = [
   StoreSettingsSchema,
   AuditLogSchema,
   DepartmentSchema,
+  DiscountOfferSchema,
   EmployeeSalarySchema,
   AttendanceRecordSchema,
   PayrollPeriodSchema,
@@ -2326,6 +2387,7 @@ export const StoreSettings = getModel<IStoreSettingsDocument>("StoreSettings", S
 export const StoreProduct = getModel<IStoreProductDocument>("StoreProduct", StoreProductSchema);
 export const StoreOrder = getModel<IStoreOrderDocument>("StoreOrder", StoreOrderSchema);
 export const Department = getModel<IDepartmentDocument>("Department", DepartmentSchema);
+export const DiscountOffer = getModel<IDiscountOfferDocument>("DiscountOffer", DiscountOfferSchema);
 export const EmployeeSalary = getModel<IEmployeeSalaryDocument>("EmployeeSalary", EmployeeSalarySchema);
 export const AttendanceRecord = getModel<IAttendanceRecordDocument>("AttendanceRecord", AttendanceRecordSchema);
 export const PayrollPeriod = getModel<IPayrollPeriodDocument>("PayrollPeriod", PayrollPeriodSchema);

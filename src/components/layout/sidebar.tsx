@@ -28,6 +28,7 @@ const NAV_SECTIONS: Array<{ labelKey: keyof Dictionary["nav"]; items: NavItem[] 
       { labelKey: "pos", href: "/pos", icon: "🛒", permission: ["products", "sales", "cashRegister"] },
       { labelKey: "products", href: "/products", icon: "📦", permission: "products" },
       { labelKey: "categories", href: "/categories", icon: "🏷️", permission: "categories" },
+      { labelKey: "discounts", href: "/discounts", icon: "🎁", permission: "discounts" },
       { labelKey: "inventory", href: "/inventory", icon: "📋", permission: "inventory" },
       { labelKey: "warehouses", href: "/warehouses", icon: "🏗️", permission: ["inventory", "transfers"] },
       { labelKey: "departments", href: "/departments", icon: "🏬", permission: "departments" },

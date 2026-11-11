@@ -199,6 +199,30 @@ export async function GET(req: NextRequest) {
           outOfStock: { $sum: { $cond: [{ $lte: ["$currentStock", 0] }, 1, 0] } },
           expired: { $sum: { $cond: [{ $gt: ["$expiredQty", 0] }, 1, 0] } },
           expiring: { $sum: { $cond: [{ $gt: ["$expiringQty", 0] }, 1, 0] } },
+          // Total units held in shops and in warehouses, so the two are never
+          // conflated: the POS only sells shop stock, warehouses hold reserve.
+          shopUnits: {
+            $sum: {
+              $sum: {
+                $map: {
+                  input: "$stockByLocation",
+                  as: "loc",
+                  in: { $cond: [{ $ne: ["$$loc._id.warehouseId", null] }, 0, "$$loc.quantity"] },
+                },
+              },
+            },
+          },
+          warehouseUnits: {
+            $sum: {
+              $sum: {
+                $map: {
+                  input: "$stockByLocation",
+                  as: "loc",
+                  in: { $cond: [{ $ne: ["$$loc._id.warehouseId", null] }, "$$loc.quantity", 0] },
+                },
+              },
+            },
+          },
         },
       },
     ]);
@@ -208,12 +232,16 @@ export async function GET(req: NextRequest) {
       outOfStock: 0,
       expired: 0,
       expiring: 0,
+      shopUnits: 0,
+      warehouseUnits: 0,
     }) as {
       totalProducts: number;
       lowStock: number;
       outOfStock: number;
       expired: number;
       expiring: number;
+      shopUnits: number;
+      warehouseUnits: number;
     };
 
     // Movement history — every location, unless one is selected.

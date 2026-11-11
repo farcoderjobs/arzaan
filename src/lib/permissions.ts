@@ -20,6 +20,10 @@ export const PERMISSIONS = {
     update: "brands.update",
     delete: "brands.delete",
   },
+  discounts: {
+    view: "discounts.view",
+    manage: "discounts.manage",
+  },
   inventory: {
     view: "inventory.view",
     adjust: "inventory.adjust",

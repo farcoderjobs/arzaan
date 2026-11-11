@@ -8,9 +8,11 @@ import {
   buildReturnItems,
   restockReturnItems,
   reverseBonusForReturn,
+  lineRefundValue,
   ReturnItemInput,
   ReturnValidationError,
   resolveRefundMethod,
+  type RefundableSale,
 } from "@/lib/returns-service";
 import {
   CompleteSaleInput,
@@ -82,6 +84,9 @@ type SaleDoc = {
   paymentMethod: string | null;
   payments: Array<{ method: string; amount: number }>;
   items: Array<ISaleItemSnapshot & { _id?: mongoose.Types.ObjectId }>;
+  subtotal: number;
+  /** Includes line discounts plus sale-level discount and employee benefit. */
+  discount: number;
   total: number;
   bonusEarned: number;
 };
@@ -446,6 +451,9 @@ export async function lookupSaleForReturn(saleId: string) {
           (returnedByLine.get(lineId) ?? 0) +
             (item.productId && !returnedByLine.has(lineId) ? returnedByProduct.get(item.productId.toString()) ?? 0 : 0)
         );
+        // Refund per unit as the customer actually paid it: wholesale price,
+        // line/sale discounts and the employee benefit already deducted.
+        const refund = lineRefundValue(sale as unknown as RefundableSale, item);
         return {
           lineId,
           productId: item.productId?.toString() ?? null,
@@ -458,6 +466,9 @@ export async function lookupSaleForReturn(saleId: string) {
           discount: item.discount,
           tax: item.tax,
           subtotal: item.subtotal,
+          linePaid: refund.paid,
+          discountApplied: refund.discountApplied,
+          unitRefund: item.quantity > 0 ? round2(refund.paid / item.quantity) : 0,
           returnedQuantity: returned,
           returnableQuantity: round2(Math.max(0, item.quantity - returned)),
         };

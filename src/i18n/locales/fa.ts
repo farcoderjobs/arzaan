@@ -73,6 +73,7 @@ const fa: Dictionary = {
     pos: "نقطه فروش",
     products: "محصولات",
     categories: "دسته‌بندی‌ها",
+    discounts: "تخفیف‌ها",
     inventory: "موجودی",
     purchases: "خریدها",
     customers: "مشتریان",
