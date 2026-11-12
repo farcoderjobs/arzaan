@@ -19,6 +19,10 @@
  *    snapshot are re-pointed by name so users keep a role that exists here;
  *  - a document that still collides on a unique index is reported and skipped
  *    rather than aborting the whole import;
+ *  - after the import, users whose `roleId` does not exist here are re-pointed
+ *    at the role of the same name, which repairs a database that was imported
+ *    before its roles existed (that state logs in fine but answers every
+ *    permission check with 403);
  *  - writes go through the raw driver, so no mongoose hook queues the seeded
  *    documents for replication (a restore must not look like 400 shop edits).
  *
@@ -166,6 +170,65 @@ async function writeOps(
   }
 }
 
+/**
+ * Re-points users whose role does not exist in this database.
+ *
+ * An earlier seed could import users before the roles were created, or with the
+ * ids of the machine the snapshot came from, leaving `roleId` dangling. Login
+ * still succeeds (the user row is valid), but every permission lookup resolves
+ * no role, so the whole application answers 403. The intended role is recovered
+ * from the snapshot by email and matched on its name, which is what is shared
+ * between machines — the ids are not.
+ */
+async function reconcileUserRoles(
+  db: mongoose.mongo.Db,
+  snapshot: Snapshot,
+  snapshotRoleNames: Map<string, string>
+): Promise<void> {
+  const snapshotUsers = snapshot.collections.find((c) => c.name === "users");
+  const roleNameByEmail = new Map<string, string>();
+  for (const serialized of snapshotUsers?.docs ?? []) {
+    const doc = EJSON.deserialize(serialized) as { email?: unknown; roleId?: unknown };
+    if (typeof doc.email !== "string" || doc.roleId === undefined) continue;
+    const roleName = snapshotRoleNames.get(String(doc.roleId));
+    if (roleName) roleNameByEmail.set(doc.email.toLowerCase(), roleName);
+  }
+
+  const roles = await db.collection("roles").find({}).project({ name: 1 }).toArray();
+  const roleIds = new Set(roles.map((role) => String(role._id)));
+  const roleIdByName = new Map(roles.map((role) => [String(role.name), String(role._id)]));
+
+  const users = await db
+    .collection("users")
+    .find({})
+    .project({ email: 1, roleId: 1 })
+    .toArray();
+
+  let repaired = 0;
+  const unresolved: string[] = [];
+  for (const user of users) {
+    if (user.roleId && roleIds.has(String(user.roleId))) continue;
+    const email = String(user.email ?? "");
+    const roleName = roleNameByEmail.get(email.toLowerCase());
+    const targetId = roleName ? roleIdByName.get(roleName) : undefined;
+    if (!targetId) {
+      unresolved.push(email || String(user._id));
+      continue;
+    }
+    const result = await db
+      .collection("users")
+      .updateOne({ _id: user._id }, { $set: { roleId: new mongoose.Types.ObjectId(targetId) } });
+    if (result.modifiedCount > 0) repaired += 1;
+  }
+
+  if (repaired > 0) {
+    console.log(`Users: re-pointed ${repaired} at the role that exists in this database`);
+  }
+  if (unresolved.length > 0) {
+    console.log(`Users: ${unresolved.length} still have no matching role — ${unresolved.join(", ")}`);
+  }
+}
+
 async function main() {
   const snapshot = await loadSnapshot();
 
@@ -289,6 +352,8 @@ async function main() {
     const duplicates = counts.skipped > 0 ? `, ${counts.skipped} skipped (same unique key)` : "";
     console.log(`${name}: ${docs.length} in seed → ${detail}${duplicates}`);
   }
+
+  await reconcileUserRoles(db, snapshot, snapshotRoleNames);
 
   console.log(
     `\nDone. ${inserted} inserted, ` +
