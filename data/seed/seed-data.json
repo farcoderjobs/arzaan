@@ -1,6 +1,6 @@
 {
   "meta": {
-    "exportedAt": "2026-11-12T07:07:59.134Z",
+    "exportedAt": "2026-11-12T07:34:37.076Z",
     "sourceDatabase": "arzaan-store",
     "generator": "scripts/export-seed-data.ts"
   },
@@ -22,13 +22,13 @@
     "discountoffers": 1,
     "cashregisters": 1,
     "purchases": 2,
-    "inventorymovements": 6,
-    "sales": 2,
+    "inventorymovements": 7,
+    "sales": 3,
     "salereturns": 2,
     "suppliertransactions": 3,
-    "cashtransactions": 5,
+    "cashtransactions": 6,
     "payments": 1,
-    "auditlogs": 15
+    "auditlogs": 16
   },
   "collections": [
     {
@@ -113,7 +113,7 @@
           "description": "View dashboard",
           "name": "dashboard.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:36.698Z"
+            "$date": "2026-11-12T07:26:17.655Z"
           }
         },
         {
@@ -128,7 +128,7 @@
           "description": "View products",
           "name": "products.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.034Z"
+            "$date": "2026-11-12T07:26:17.954Z"
           }
         },
         {
@@ -143,7 +143,7 @@
           "description": "Create products",
           "name": "products.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.235Z"
+            "$date": "2026-11-12T07:26:18.152Z"
           }
         },
         {
@@ -158,7 +158,7 @@
           "description": "Update products",
           "name": "products.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.340Z"
+            "$date": "2026-11-12T07:26:18.246Z"
           }
         },
         {
@@ -173,7 +173,7 @@
           "description": "Delete products",
           "name": "products.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.412Z"
+            "$date": "2026-11-12T07:26:18.341Z"
           }
         },
         {
@@ -188,7 +188,7 @@
           "description": "View categories",
           "name": "categories.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.462Z"
+            "$date": "2026-11-12T07:26:18.399Z"
           }
         },
         {
@@ -203,7 +203,7 @@
           "description": "Create categories",
           "name": "categories.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.478Z"
+            "$date": "2026-11-12T07:26:18.408Z"
           }
         },
         {
@@ -218,7 +218,7 @@
           "description": "Update categories",
           "name": "categories.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.485Z"
+            "$date": "2026-11-12T07:26:18.420Z"
           }
         },
         {
@@ -233,7 +233,7 @@
           "description": "Delete categories",
           "name": "categories.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.494Z"
+            "$date": "2026-11-12T07:26:18.429Z"
           }
         },
         {
@@ -248,7 +248,7 @@
           "description": "View inventory",
           "name": "inventory.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.546Z"
+            "$date": "2026-11-12T07:26:18.491Z"
           }
         },
         {
@@ -263,7 +263,7 @@
           "description": "Adjust inventory",
           "name": "inventory.adjust",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.554Z"
+            "$date": "2026-11-12T07:26:18.498Z"
           }
         },
         {
@@ -278,7 +278,7 @@
           "description": "Perform inventory counts",
           "name": "inventory.count",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.562Z"
+            "$date": "2026-11-12T07:26:18.508Z"
           }
         },
         {
@@ -293,7 +293,7 @@
           "description": "View sales",
           "name": "sales.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.569Z"
+            "$date": "2026-11-12T07:26:18.517Z"
           }
         },
         {
@@ -308,7 +308,7 @@
           "description": "Create sales",
           "name": "sales.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.576Z"
+            "$date": "2026-11-12T07:26:18.525Z"
           }
         },
         {
@@ -323,7 +323,7 @@
           "description": "Cancel sales",
           "name": "sales.cancel",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.582Z"
+            "$date": "2026-11-12T07:26:18.533Z"
           }
         },
         {
@@ -338,7 +338,7 @@
           "description": "Process refunds",
           "name": "sales.refund",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.591Z"
+            "$date": "2026-11-12T07:26:18.541Z"
           }
         },
         {
@@ -353,7 +353,7 @@
           "description": "View purchases",
           "name": "purchases.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.682Z"
+            "$date": "2026-11-12T07:26:18.744Z"
           }
         },
         {
@@ -368,7 +368,7 @@
           "description": "Create purchases",
           "name": "purchases.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.698Z"
+            "$date": "2026-11-12T07:26:18.758Z"
           }
         },
         {
@@ -383,7 +383,7 @@
           "description": "Update purchases",
           "name": "purchases.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.705Z"
+            "$date": "2026-11-12T07:26:18.767Z"
           }
         },
         {
@@ -398,7 +398,7 @@
           "description": "Cancel purchases",
           "name": "purchases.cancel",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.714Z"
+            "$date": "2026-11-12T07:26:18.774Z"
           }
         },
         {
@@ -413,7 +413,7 @@
           "description": "View customers",
           "name": "customers.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.890Z"
+            "$date": "2026-11-12T07:26:18.882Z"
           }
         },
         {
@@ -428,7 +428,7 @@
           "description": "Create customers",
           "name": "customers.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.900Z"
+            "$date": "2026-11-12T07:26:18.890Z"
           }
         },
         {
@@ -443,7 +443,7 @@
           "description": "Update customers",
           "name": "customers.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.913Z"
+            "$date": "2026-11-12T07:26:18.901Z"
           }
         },
         {
@@ -458,7 +458,7 @@
           "description": "Delete customers",
           "name": "customers.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.921Z"
+            "$date": "2026-11-12T07:26:18.912Z"
           }
         },
         {
@@ -473,7 +473,7 @@
           "description": "Record customer payments",
           "name": "customers.payment",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.930Z"
+            "$date": "2026-11-12T07:26:18.961Z"
           }
         },
         {
@@ -488,7 +488,7 @@
           "description": "View suppliers",
           "name": "suppliers.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.942Z"
+            "$date": "2026-11-12T07:26:18.989Z"
           }
         },
         {
@@ -503,7 +503,7 @@
           "description": "Create suppliers",
           "name": "suppliers.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.954Z"
+            "$date": "2026-11-12T07:26:18.999Z"
           }
         },
         {
@@ -518,7 +518,7 @@
           "description": "Update suppliers",
           "name": "suppliers.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.964Z"
+            "$date": "2026-11-12T07:26:19.015Z"
           }
         },
         {
@@ -533,7 +533,7 @@
           "description": "Delete suppliers",
           "name": "suppliers.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.980Z"
+            "$date": "2026-11-12T07:26:19.068Z"
           }
         },
         {
@@ -548,7 +548,7 @@
           "description": "Record supplier payments",
           "name": "suppliers.payment",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.994Z"
+            "$date": "2026-11-12T07:26:19.090Z"
           }
         },
         {
@@ -563,7 +563,7 @@
           "description": "View expenses",
           "name": "expenses.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.002Z"
+            "$date": "2026-11-12T07:26:19.098Z"
           }
         },
         {
@@ -578,7 +578,7 @@
           "description": "Create expenses",
           "name": "expenses.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.011Z"
+            "$date": "2026-11-12T07:26:19.135Z"
           }
         },
         {
@@ -593,7 +593,7 @@
           "description": "Update expenses",
           "name": "expenses.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.027Z"
+            "$date": "2026-11-12T07:26:19.143Z"
           }
         },
         {
@@ -608,7 +608,7 @@
           "description": "Delete expenses",
           "name": "expenses.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.042Z"
+            "$date": "2026-11-12T07:26:19.160Z"
           }
         },
         {
@@ -623,7 +623,7 @@
           "description": "View cash register",
           "name": "cash_register.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.055Z"
+            "$date": "2026-11-12T07:26:19.167Z"
           }
         },
         {
@@ -638,7 +638,7 @@
           "description": "Open cash register",
           "name": "cash_register.open",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.063Z"
+            "$date": "2026-11-12T07:26:19.174Z"
           }
         },
         {
@@ -653,7 +653,7 @@
           "description": "Close cash register",
           "name": "cash_register.close",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.070Z"
+            "$date": "2026-11-12T07:26:19.184Z"
           }
         },
         {
@@ -668,7 +668,7 @@
           "description": "View sales reports",
           "name": "reports.sales",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.082Z"
+            "$date": "2026-11-12T07:26:19.191Z"
           }
         },
         {
@@ -683,7 +683,7 @@
           "description": "View product reports",
           "name": "reports.products",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.098Z"
+            "$date": "2026-11-12T07:26:19.199Z"
           }
         },
         {
@@ -698,7 +698,7 @@
           "description": "View inventory reports",
           "name": "reports.inventory",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.110Z"
+            "$date": "2026-11-12T07:26:19.206Z"
           }
         },
         {
@@ -713,7 +713,7 @@
           "description": "View purchase reports",
           "name": "reports.purchases",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.120Z"
+            "$date": "2026-11-12T07:26:19.213Z"
           }
         },
         {
@@ -728,7 +728,7 @@
           "description": "View profit reports",
           "name": "reports.profit",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.137Z"
+            "$date": "2026-11-12T07:26:19.231Z"
           }
         },
         {
@@ -743,7 +743,7 @@
           "description": "View finance reports",
           "name": "reports.finance",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.150Z"
+            "$date": "2026-11-12T07:26:19.241Z"
           }
         },
         {
@@ -758,7 +758,7 @@
           "description": "View users",
           "name": "users.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.288Z"
+            "$date": "2026-11-12T07:26:19.374Z"
           }
         },
         {
@@ -773,7 +773,7 @@
           "description": "Create users",
           "name": "users.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.295Z"
+            "$date": "2026-11-12T07:26:19.385Z"
           }
         },
         {
@@ -788,7 +788,7 @@
           "description": "Update users",
           "name": "users.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.302Z"
+            "$date": "2026-11-12T07:26:19.397Z"
           }
         },
         {
@@ -803,7 +803,7 @@
           "description": "Delete users",
           "name": "users.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.314Z"
+            "$date": "2026-11-12T07:26:19.412Z"
           }
         },
         {
@@ -818,7 +818,7 @@
           "description": "View roles",
           "name": "roles.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.328Z"
+            "$date": "2026-11-12T07:26:19.429Z"
           }
         },
         {
@@ -833,7 +833,7 @@
           "description": "Manage roles and permissions",
           "name": "roles.manage",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.342Z"
+            "$date": "2026-11-12T07:26:19.437Z"
           }
         },
         {
@@ -848,7 +848,7 @@
           "description": "View settings",
           "name": "settings.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.349Z"
+            "$date": "2026-11-12T07:26:19.461Z"
           }
         },
         {
@@ -863,7 +863,7 @@
           "description": "Manage settings",
           "name": "settings.manage",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.360Z"
+            "$date": "2026-11-12T07:26:19.480Z"
           }
         },
         {
@@ -878,7 +878,7 @@
           "description": "View audit logs",
           "name": "audit_logs.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.368Z"
+            "$date": "2026-11-12T07:26:19.500Z"
           }
         },
         {
@@ -893,7 +893,7 @@
           "description": "View brands",
           "name": "brands.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.503Z"
+            "$date": "2026-11-12T07:26:18.438Z"
           }
         },
         {
@@ -908,7 +908,7 @@
           "description": "Create brands",
           "name": "brands.create",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.511Z"
+            "$date": "2026-11-12T07:26:18.447Z"
           }
         },
         {
@@ -923,7 +923,7 @@
           "description": "Update brands",
           "name": "brands.update",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.517Z"
+            "$date": "2026-11-12T07:26:18.454Z"
           }
         },
         {
@@ -938,7 +938,7 @@
           "description": "Delete brands",
           "name": "brands.delete",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.524Z"
+            "$date": "2026-11-12T07:26:18.461Z"
           }
         },
         {
@@ -953,7 +953,7 @@
           "description": "View online store reports",
           "name": "reports.store",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.163Z"
+            "$date": "2026-11-12T07:26:19.248Z"
           }
         },
         {
@@ -968,7 +968,7 @@
           "description": "View online store products",
           "name": "store.view",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.251Z"
+            "$date": "2026-11-12T07:26:19.329Z"
           }
         },
         {
@@ -983,7 +983,7 @@
           "description": "Add and edit online store products",
           "name": "store.manage",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.270Z"
+            "$date": "2026-11-12T07:26:19.347Z"
           }
         },
         {
@@ -998,7 +998,7 @@
           "description": "Manage online store orders",
           "name": "store.orders",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.281Z"
+            "$date": "2026-11-12T07:26:19.367Z"
           }
         },
         {
@@ -1013,7 +1013,7 @@
           "description": "Apply discounts to sales",
           "name": "sales.discount",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.598Z"
+            "$date": "2026-11-12T07:26:18.549Z"
           }
         },
         {
@@ -1028,7 +1028,7 @@
           },
           "description": "Apply wholesale price tiers at POS",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.605Z"
+            "$date": "2026-11-12T07:26:18.556Z"
           }
         },
         {
@@ -1043,7 +1043,7 @@
           },
           "description": "Sell expired stock with a logged override",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.612Z"
+            "$date": "2026-11-12T07:26:18.564Z"
           }
         },
         {
@@ -1058,7 +1058,7 @@
           },
           "description": "View departments",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.621Z"
+            "$date": "2026-11-12T07:26:18.570Z"
           }
         },
         {
@@ -1073,7 +1073,7 @@
           },
           "description": "Create departments",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.630Z"
+            "$date": "2026-11-12T07:26:18.584Z"
           }
         },
         {
@@ -1088,7 +1088,7 @@
           },
           "description": "Update departments and assignments",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.638Z"
+            "$date": "2026-11-12T07:26:18.592Z"
           }
         },
         {
@@ -1103,7 +1103,7 @@
           },
           "description": "Deactivate departments",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.648Z"
+            "$date": "2026-11-12T07:26:18.599Z"
           }
         },
         {
@@ -1118,7 +1118,7 @@
           },
           "description": "View attendance records",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.656Z"
+            "$date": "2026-11-12T07:26:18.607Z"
           }
         },
         {
@@ -1133,7 +1133,7 @@
           },
           "description": "Mark and correct attendance",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.662Z"
+            "$date": "2026-11-12T07:26:18.659Z"
           }
         },
         {
@@ -1148,7 +1148,7 @@
           },
           "description": "View salary configuration and payroll",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.668Z"
+            "$date": "2026-11-12T07:26:18.715Z"
           }
         },
         {
@@ -1163,7 +1163,7 @@
           },
           "description": "Configure salaries and finalize payroll",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.675Z"
+            "$date": "2026-11-12T07:26:18.731Z"
           }
         },
         {
@@ -1178,7 +1178,7 @@
           },
           "description": "Record Import (China) purchases",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.688Z"
+            "$date": "2026-11-12T07:26:18.750Z"
           }
         },
         {
@@ -1193,7 +1193,7 @@
           },
           "description": "View department sales and profit reports",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.179Z"
+            "$date": "2026-11-12T07:26:19.258Z"
           }
         },
         {
@@ -1208,7 +1208,7 @@
           },
           "description": "View stock transfers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.204Z"
+            "$date": "2026-11-12T07:26:19.265Z"
           }
         },
         {
@@ -1223,7 +1223,7 @@
           },
           "description": "Create stock transfers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.215Z"
+            "$date": "2026-11-12T07:26:19.278Z"
           }
         },
         {
@@ -1238,7 +1238,7 @@
           },
           "description": "Dispatch stock transfers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.221Z"
+            "$date": "2026-11-12T07:26:19.286Z"
           }
         },
         {
@@ -1253,7 +1253,7 @@
           },
           "description": "Receive stock transfers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.231Z"
+            "$date": "2026-11-12T07:26:19.296Z"
           }
         },
         {
@@ -1268,7 +1268,7 @@
           },
           "description": "Cancel stock transfers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:38.241Z"
+            "$date": "2026-11-12T07:26:19.316Z"
           }
         },
         {
@@ -1283,7 +1283,7 @@
           },
           "description": "View customer bonus balances and ledger",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.733Z"
+            "$date": "2026-11-12T07:26:18.781Z"
           }
         },
         {
@@ -1298,7 +1298,7 @@
           },
           "description": "Redeem customer bonus at POS",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.746Z"
+            "$date": "2026-11-12T07:26:18.787Z"
           }
         },
         {
@@ -1313,7 +1313,7 @@
           },
           "description": "Configure customer bonus rules and rates",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.755Z"
+            "$date": "2026-11-12T07:26:18.794Z"
           }
         },
         {
@@ -1328,7 +1328,7 @@
           },
           "description": "Manually adjust a customer's bonus balance",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.775Z"
+            "$date": "2026-11-12T07:26:18.801Z"
           }
         },
         {
@@ -1343,7 +1343,7 @@
           },
           "description": "View customer bonus reports",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.787Z"
+            "$date": "2026-11-12T07:26:18.810Z"
           }
         },
         {
@@ -1358,7 +1358,7 @@
           },
           "description": "View employee purchases and balances",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.801Z"
+            "$date": "2026-11-12T07:26:18.816Z"
           }
         },
         {
@@ -1373,7 +1373,7 @@
           },
           "description": "Process purchases on behalf of an employee",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.811Z"
+            "$date": "2026-11-12T07:26:18.822Z"
           }
         },
         {
@@ -1388,7 +1388,7 @@
           },
           "description": "Apply the employee purchase benefit",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.819Z"
+            "$date": "2026-11-12T07:26:18.830Z"
           }
         },
         {
@@ -1403,7 +1403,7 @@
           },
           "description": "Record employee purchase payments",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.832Z"
+            "$date": "2026-11-12T07:26:18.836Z"
           }
         },
         {
@@ -1418,7 +1418,7 @@
           },
           "description": "Approve employee purchases on credit",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.848Z"
+            "$date": "2026-11-12T07:26:18.842Z"
           }
         },
         {
@@ -1433,7 +1433,7 @@
           },
           "description": "Approve or exclude payroll deductions",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.858Z"
+            "$date": "2026-11-12T07:26:18.853Z"
           }
         },
         {
@@ -1448,7 +1448,7 @@
           },
           "description": "Configure employee benefit rates and limits",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.865Z"
+            "$date": "2026-11-12T07:26:18.862Z"
           }
         },
         {
@@ -1463,7 +1463,7 @@
           },
           "description": "View employee purchase reports",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.874Z"
+            "$date": "2026-11-12T07:26:18.874Z"
           }
         },
         {
@@ -1478,7 +1478,7 @@
           },
           "description": "View discount offers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.530Z"
+            "$date": "2026-11-12T07:26:18.469Z"
           }
         },
         {
@@ -1493,7 +1493,7 @@
           },
           "description": "Create, edit and stop discount offers",
           "updatedAt": {
-            "$date": "2026-11-11T19:00:37.537Z"
+            "$date": "2026-11-12T07:26:18.482Z"
           }
         }
       ]
@@ -3320,7 +3320,7 @@
           },
           "email": "admin@pos.local",
           "lastLoginAt": {
-            "$date": "2026-11-11T14:47:32.494Z"
+            "$date": "2026-11-12T07:28:24.227Z"
           },
           "name": "Store Admin",
           "passwordHash": "$2a$12$CjJlvpnVPPMuEz6o3PMTJ.xduB4ivFVoBEEis.V8/yLEJQy9RRrZm",
@@ -3330,7 +3330,7 @@
           },
           "status": "active",
           "updatedAt": {
-            "$date": "2026-11-11T14:47:32.495Z"
+            "$date": "2026-11-12T07:28:24.228Z"
           },
           "purchaseOutstanding": 0
         },
@@ -5943,6 +5943,39 @@
             "$date": "2026-11-11T16:59:27.111Z"
           },
           "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af56abbc89edb19df0f710e"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "SALE_OUT",
+          "quantity": 1,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": "local",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af56abbc89edb19df0f710b"
+          },
+          "note": "Sale INV-202611-000003",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "__v": 0,
+          "createdAt": {
+            "$date": "2026-11-12T07:28:59.926Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-12T07:28:59.926Z"
+          }
         }
       ]
     },
@@ -6112,6 +6145,89 @@
           },
           "updatedAt": {
             "$date": "2026-11-11T16:57:32.248Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af56abbc89edb19df0f710b"
+          },
+          "invoiceNumber": "INV-202611-000003",
+          "clientTransactionId": "df6f6cea-4341-4454-a30b-f63b96e5d225",
+          "deviceId": null,
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "customerId": null,
+          "cashierId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "employeeId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "departmentId": null,
+          "departmentName": "",
+          "status": "completed",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "itemType": "inventory",
+              "pricingMode": "retail",
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 1,
+              "sellingPrice": 220,
+              "costPrice": 200,
+              "discount": 11,
+              "tax": 0,
+              "subtotal": 209,
+              "purchaseSource": "local",
+              "departmentId": null,
+              "departmentName": "",
+              "_id": {
+                "$oid": "6af56abbc89edb19df0f710c"
+              }
+            }
+          ],
+          "subtotal": 220,
+          "discount": 11,
+          "discountType": "amount",
+          "tax": 0,
+          "total": 209,
+          "paidAmount": 209,
+          "changeAmount": 0,
+          "paymentMethod": "cash",
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 209,
+              "reference": "",
+              "_id": {
+                "$oid": "6af56abbc89edb19df0f710d"
+              }
+            }
+          ],
+          "pricingMode": "retail",
+          "bonusPercent": 0,
+          "bonusEarned": 0,
+          "bonusRedeemed": 0,
+          "bonusEarnBase": 0,
+          "bonusGranted": true,
+          "originalSaleId": null,
+          "exchangeReturnId": null,
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "heldAt": null,
+          "heldBy": null,
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-12T07:28:59.690Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-12T07:28:59.690Z"
           },
           "__v": 0
         }
@@ -6500,6 +6616,34 @@
           },
           "updatedAt": {
             "$date": "2026-11-11T16:57:59.451Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af56abcc89edb19df0f710f"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "sale",
+          "amount": 209,
+          "description": "Sale INV-202611-000003",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af56abbc89edb19df0f710b"
+          },
+          "createdAt": {
+            "$date": "2026-11-12T07:29:00.173Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-12T07:29:00.173Z"
           },
           "__v": 0
         }
@@ -7055,6 +7199,50 @@
           },
           "updatedAt": {
             "$date": "2026-11-11T16:59:27.247Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af56abcc89edb19df0f7110"
+          },
+          "action": "sale.create",
+          "entityType": "Sale",
+          "entityId": {
+            "$oid": "6af56abbc89edb19df0f710b"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "invoiceNumber": "INV-202611-000003",
+                "total": 209,
+                "paidAmount": 209,
+                "creditUsed": 0,
+                "pricingMode": "retail",
+                "wholesaleItems": 0,
+                "bonusGranted": true,
+                "bonusEarned": 0,
+                "bonusRedeemed": 0,
+                "directItems": 0,
+                "expiredOverride": false
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": null,
+          "createdAt": {
+            "$date": "2026-11-12T07:29:00.588Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-12T07:29:00.588Z"
           },
           "__v": 0
         }
