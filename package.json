@@ -13,7 +13,7 @@
     "test:integration": "node scripts/run-integration.mjs",
     "test:e2e": "playwright test",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "seed": "tsx src/scripts/seed.ts && tsx scripts/seed-all-data.ts",
+    "seed": "tsx scripts/seed-all-data.ts && tsx src/scripts/seed.ts",
     "seed:store": "tsx src/scripts/seed-store-products.ts",
     "seed:export": "tsx scripts/export-seed-data.ts",
     "seed:data": "tsx scripts/seed-all-data.ts",

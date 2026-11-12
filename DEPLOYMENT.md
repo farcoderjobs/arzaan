@@ -186,7 +186,11 @@ npm run db:check           # verify row counts and that the local DB is active
 ```
 
 The import only inserts documents that are missing (`$setOnInsert` by `_id`), so
-it is safe to re-run and never overwrites local edits. When the snapshot must
+it is safe to re-run and never overwrites local edits. Roles, permissions and
+users are matched on their business key (name/email) instead, because
+`npm run seed` creates roles and permissions with this computer's own ids: on a
+database that was already seeded the snapshot row is kept, and the seeded users
+are re-pointed at the role that actually exists there. When the snapshot must
 win, use `npm run seed:data -- --replace` (destructive).
 
 `.env` is git-ignored, so it does not travel with the repository. Copy it to the
