@@ -34,6 +34,7 @@ export default async function PosPage() {
       storeName={settings.storeName}
       storeAddress={settings.address}
       storePhone={settings.phone}
+      logoUrl={settings.logoUrl}
     />
   );
 }

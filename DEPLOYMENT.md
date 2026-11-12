@@ -165,3 +165,77 @@ reversed.
   (`payroll.absence_allowance_days`).
 - The E2E suite covers offline capture/reload/sync; the new department, payroll
   and transfer flows are covered by unit and integration tests.
+
+---
+
+## 6. Copying the live data to another PC
+
+`npm run seed` is the one command a fresh install needs: it seeds
+roles/permissions **and** imports `data/seed/seed-data.json`, which carries the
+branches, users (with password hashes), settings, catalogue, customers,
+suppliers, store products and business history of the machine that exported it.
+
+```bash
+# on the PC that owns the current data (it must reach MongoDB)
+npm run seed:export        # rewrites data/seed/seed-data.json from the live DB
+
+# commit + push the updated snapshot, then on the other PC:
+git pull
+npm run seed               # roles/permissions + all data from the snapshot
+npm run db:check           # verify row counts and that the local DB is active
+```
+
+The import only inserts documents that are missing (`$setOnInsert` by `_id`), so
+it is safe to re-run and never overwrites local edits. When the snapshot must
+win, use `npm run seed:data -- --replace` (destructive).
+
+`.env` is git-ignored, so it does not travel with the repository. Copy it to the
+other PC as well (same `JWT_SECRET`, `LICENSE_SECRET`, MongoDB URIs and sync
+settings); the seeded user passwords keep working because the hashes are part of
+the snapshot.
+
+---
+
+## 7. Client PC without the source code
+
+`next start` serves the compiled output in `.next/`; it never reads `src/`.
+After `npm run build` on the client PC, delete the source tree before handing the
+machine over.
+
+**Keep** (the server will not start without these):
+
+| Path | Why |
+| --- | --- |
+| `.next/` | Compiled server routes, pages and static assets — the `npm start` entry point |
+| `public/` | Served at `/`: `arzaan-logo.jpeg` (receipts), `sw.js`, `offline.html` |
+| `node_modules/` | Runtime packages (`next`, `mongoose`, `react`, …) |
+| `package.json` | Provides the `start` script |
+| `next.config.ts` | Read when the production server starts |
+| `.env` | Database, JWT, licence and sync configuration |
+
+`tsconfig.json` and `next-env.d.ts` are harmless and can stay.
+
+**Delete** (nothing here is needed at runtime):
+
+```bash
+rm -rf src scripts tests docs data .git .db-backup \
+       MANUAL.md DEPLOYMENT.md README.md AGENTS.md CLAUDE.md \
+       eslint.config.mjs postcss.config.mjs \
+       vitest.config.ts vitest.integration.config.ts playwright.config.ts \
+       test-results *.log
+```
+
+Notes:
+
+- Import the data (`npm run seed`) **before** deleting `scripts/` and `data/`;
+  after that the client PC has no seeder and no snapshot left to import.
+- Deleting `.git/` removes the full history, so the code cannot be cloned back
+  from the client machine. Keep your own repository elsewhere.
+- Deleting `src/` prevents future `npm run build` on that machine. Build on your
+  development PC, then copy the production folder to the client.
+- Browser bundles in `.next/` and `public/sw.js` are still readable JavaScript;
+  this hides the source tree, not compiled/minified code.
+- For the smallest handover, `output: "standalone"` in `next.config.ts` emits a
+  self-contained `.next/standalone` (server + traced `node_modules`) that runs
+  with `node .next/standalone/server.js` after copying `public` and
+  `.next/static` into it. The current setup uses `next start`.

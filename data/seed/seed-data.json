@@ -1,12 +1,12 @@
 {
   "meta": {
-    "exportedAt": "2026-11-05T19:26:45.188Z",
+    "exportedAt": "2026-11-12T07:07:59.134Z",
     "sourceDatabase": "arzaan-store",
     "generator": "scripts/export-seed-data.ts"
   },
   "counts": {
     "branches": 3,
-    "permissions": 91,
+    "permissions": 93,
     "roles": 5,
     "users": 4,
     "warehouses": 1,
@@ -19,7 +19,16 @@
     "customers": 1,
     "products": 19,
     "suppliers": 2,
-    "auditlogs": 8
+    "discountoffers": 1,
+    "cashregisters": 1,
+    "purchases": 2,
+    "inventorymovements": 6,
+    "sales": 2,
+    "salereturns": 2,
+    "suppliertransactions": 3,
+    "cashtransactions": 5,
+    "payments": 1,
+    "auditlogs": 15
   },
   "collections": [
     {
@@ -104,7 +113,7 @@
           "description": "View dashboard",
           "name": "dashboard.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:30.697Z"
+            "$date": "2026-11-11T19:00:36.698Z"
           }
         },
         {
@@ -119,7 +128,7 @@
           "description": "View products",
           "name": "products.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:33.142Z"
+            "$date": "2026-11-11T19:00:37.034Z"
           }
         },
         {
@@ -134,7 +143,7 @@
           "description": "Create products",
           "name": "products.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:34.325Z"
+            "$date": "2026-11-11T19:00:37.235Z"
           }
         },
         {
@@ -149,7 +158,7 @@
           "description": "Update products",
           "name": "products.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:35.236Z"
+            "$date": "2026-11-11T19:00:37.340Z"
           }
         },
         {
@@ -164,7 +173,7 @@
           "description": "Delete products",
           "name": "products.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:35.779Z"
+            "$date": "2026-11-11T19:00:37.412Z"
           }
         },
         {
@@ -179,7 +188,7 @@
           "description": "View categories",
           "name": "categories.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.073Z"
+            "$date": "2026-11-11T19:00:37.462Z"
           }
         },
         {
@@ -194,7 +203,7 @@
           "description": "Create categories",
           "name": "categories.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.259Z"
+            "$date": "2026-11-11T19:00:37.478Z"
           }
         },
         {
@@ -209,7 +218,7 @@
           "description": "Update categories",
           "name": "categories.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.408Z"
+            "$date": "2026-11-11T19:00:37.485Z"
           }
         },
         {
@@ -224,7 +233,7 @@
           "description": "Delete categories",
           "name": "categories.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.556Z"
+            "$date": "2026-11-11T19:00:37.494Z"
           }
         },
         {
@@ -239,7 +248,7 @@
           "description": "View inventory",
           "name": "inventory.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.296Z"
+            "$date": "2026-11-11T19:00:37.546Z"
           }
         },
         {
@@ -254,7 +263,7 @@
           "description": "Adjust inventory",
           "name": "inventory.adjust",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.444Z"
+            "$date": "2026-11-11T19:00:37.554Z"
           }
         },
         {
@@ -269,7 +278,7 @@
           "description": "Perform inventory counts",
           "name": "inventory.count",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.598Z"
+            "$date": "2026-11-11T19:00:37.562Z"
           }
         },
         {
@@ -284,7 +293,7 @@
           "description": "View sales",
           "name": "sales.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.750Z"
+            "$date": "2026-11-11T19:00:37.569Z"
           }
         },
         {
@@ -299,7 +308,7 @@
           "description": "Create sales",
           "name": "sales.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.905Z"
+            "$date": "2026-11-11T19:00:37.576Z"
           }
         },
         {
@@ -314,7 +323,7 @@
           "description": "Cancel sales",
           "name": "sales.cancel",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.052Z"
+            "$date": "2026-11-11T19:00:37.582Z"
           }
         },
         {
@@ -329,7 +338,7 @@
           "description": "Process refunds",
           "name": "sales.refund",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.200Z"
+            "$date": "2026-11-11T19:00:37.591Z"
           }
         },
         {
@@ -344,7 +353,7 @@
           "description": "View purchases",
           "name": "purchases.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.973Z"
+            "$date": "2026-11-11T19:00:37.682Z"
           }
         },
         {
@@ -359,7 +368,7 @@
           "description": "Create purchases",
           "name": "purchases.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:40.269Z"
+            "$date": "2026-11-11T19:00:37.698Z"
           }
         },
         {
@@ -374,7 +383,7 @@
           "description": "Update purchases",
           "name": "purchases.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:40.417Z"
+            "$date": "2026-11-11T19:00:37.705Z"
           }
         },
         {
@@ -389,7 +398,7 @@
           "description": "Cancel purchases",
           "name": "purchases.cancel",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:40.565Z"
+            "$date": "2026-11-11T19:00:37.714Z"
           }
         },
         {
@@ -404,7 +413,7 @@
           "description": "View customers",
           "name": "customers.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:42.634Z"
+            "$date": "2026-11-11T19:00:37.890Z"
           }
         },
         {
@@ -419,7 +428,7 @@
           "description": "Create customers",
           "name": "customers.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:42.782Z"
+            "$date": "2026-11-11T19:00:37.900Z"
           }
         },
         {
@@ -434,7 +443,7 @@
           "description": "Update customers",
           "name": "customers.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:42.930Z"
+            "$date": "2026-11-11T19:00:37.913Z"
           }
         },
         {
@@ -449,7 +458,7 @@
           "description": "Delete customers",
           "name": "customers.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.078Z"
+            "$date": "2026-11-11T19:00:37.921Z"
           }
         },
         {
@@ -464,7 +473,7 @@
           "description": "Record customer payments",
           "name": "customers.payment",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.225Z"
+            "$date": "2026-11-11T19:00:37.930Z"
           }
         },
         {
@@ -479,7 +488,7 @@
           "description": "View suppliers",
           "name": "suppliers.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.373Z"
+            "$date": "2026-11-11T19:00:37.942Z"
           }
         },
         {
@@ -494,7 +503,7 @@
           "description": "Create suppliers",
           "name": "suppliers.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.520Z"
+            "$date": "2026-11-11T19:00:37.954Z"
           }
         },
         {
@@ -509,7 +518,7 @@
           "description": "Update suppliers",
           "name": "suppliers.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.667Z"
+            "$date": "2026-11-11T19:00:37.964Z"
           }
         },
         {
@@ -524,7 +533,7 @@
           "description": "Delete suppliers",
           "name": "suppliers.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.815Z"
+            "$date": "2026-11-11T19:00:37.980Z"
           }
         },
         {
@@ -539,7 +548,7 @@
           "description": "Record supplier payments",
           "name": "suppliers.payment",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:43.962Z"
+            "$date": "2026-11-11T19:00:37.994Z"
           }
         },
         {
@@ -554,7 +563,7 @@
           "description": "View expenses",
           "name": "expenses.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.110Z"
+            "$date": "2026-11-11T19:00:38.002Z"
           }
         },
         {
@@ -569,7 +578,7 @@
           "description": "Create expenses",
           "name": "expenses.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.257Z"
+            "$date": "2026-11-11T19:00:38.011Z"
           }
         },
         {
@@ -584,7 +593,7 @@
           "description": "Update expenses",
           "name": "expenses.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.405Z"
+            "$date": "2026-11-11T19:00:38.027Z"
           }
         },
         {
@@ -599,7 +608,7 @@
           "description": "Delete expenses",
           "name": "expenses.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.552Z"
+            "$date": "2026-11-11T19:00:38.042Z"
           }
         },
         {
@@ -614,7 +623,7 @@
           "description": "View cash register",
           "name": "cash_register.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.699Z"
+            "$date": "2026-11-11T19:00:38.055Z"
           }
         },
         {
@@ -629,7 +638,7 @@
           "description": "Open cash register",
           "name": "cash_register.open",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.847Z"
+            "$date": "2026-11-11T19:00:38.063Z"
           }
         },
         {
@@ -644,7 +653,7 @@
           "description": "Close cash register",
           "name": "cash_register.close",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:44.995Z"
+            "$date": "2026-11-11T19:00:38.070Z"
           }
         },
         {
@@ -659,7 +668,7 @@
           "description": "View sales reports",
           "name": "reports.sales",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.143Z"
+            "$date": "2026-11-11T19:00:38.082Z"
           }
         },
         {
@@ -674,7 +683,7 @@
           "description": "View product reports",
           "name": "reports.products",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.290Z"
+            "$date": "2026-11-11T19:00:38.098Z"
           }
         },
         {
@@ -689,7 +698,7 @@
           "description": "View inventory reports",
           "name": "reports.inventory",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.441Z"
+            "$date": "2026-11-11T19:00:38.110Z"
           }
         },
         {
@@ -704,7 +713,7 @@
           "description": "View purchase reports",
           "name": "reports.purchases",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.588Z"
+            "$date": "2026-11-11T19:00:38.120Z"
           }
         },
         {
@@ -719,7 +728,7 @@
           "description": "View profit reports",
           "name": "reports.profit",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.736Z"
+            "$date": "2026-11-11T19:00:38.137Z"
           }
         },
         {
@@ -734,7 +743,7 @@
           "description": "View finance reports",
           "name": "reports.finance",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:45.883Z"
+            "$date": "2026-11-11T19:00:38.150Z"
           }
         },
         {
@@ -749,7 +758,7 @@
           "description": "View users",
           "name": "users.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.508Z"
+            "$date": "2026-11-11T19:00:38.288Z"
           }
         },
         {
@@ -764,7 +773,7 @@
           "description": "Create users",
           "name": "users.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.655Z"
+            "$date": "2026-11-11T19:00:38.295Z"
           }
         },
         {
@@ -779,7 +788,7 @@
           "description": "Update users",
           "name": "users.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.803Z"
+            "$date": "2026-11-11T19:00:38.302Z"
           }
         },
         {
@@ -794,7 +803,7 @@
           "description": "Delete users",
           "name": "users.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.951Z"
+            "$date": "2026-11-11T19:00:38.314Z"
           }
         },
         {
@@ -809,7 +818,7 @@
           "description": "View roles",
           "name": "roles.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:48.099Z"
+            "$date": "2026-11-11T19:00:38.328Z"
           }
         },
         {
@@ -824,7 +833,7 @@
           "description": "Manage roles and permissions",
           "name": "roles.manage",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:48.247Z"
+            "$date": "2026-11-11T19:00:38.342Z"
           }
         },
         {
@@ -839,7 +848,7 @@
           "description": "View settings",
           "name": "settings.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:48.395Z"
+            "$date": "2026-11-11T19:00:38.349Z"
           }
         },
         {
@@ -854,7 +863,7 @@
           "description": "Manage settings",
           "name": "settings.manage",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:48.543Z"
+            "$date": "2026-11-11T19:00:38.360Z"
           }
         },
         {
@@ -869,7 +878,7 @@
           "description": "View audit logs",
           "name": "audit_logs.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:48.691Z"
+            "$date": "2026-11-11T19:00:38.368Z"
           }
         },
         {
@@ -884,7 +893,7 @@
           "description": "View brands",
           "name": "brands.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.704Z"
+            "$date": "2026-11-11T19:00:37.503Z"
           }
         },
         {
@@ -899,7 +908,7 @@
           "description": "Create brands",
           "name": "brands.create",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:36.852Z"
+            "$date": "2026-11-11T19:00:37.511Z"
           }
         },
         {
@@ -914,7 +923,7 @@
           "description": "Update brands",
           "name": "brands.update",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37Z"
+            "$date": "2026-11-11T19:00:37.517Z"
           }
         },
         {
@@ -929,7 +938,7 @@
           "description": "Delete brands",
           "name": "brands.delete",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:37.148Z"
+            "$date": "2026-11-11T19:00:37.524Z"
           }
         },
         {
@@ -944,7 +953,7 @@
           "description": "View online store reports",
           "name": "reports.store",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.031Z"
+            "$date": "2026-11-11T19:00:38.163Z"
           }
         },
         {
@@ -959,7 +968,7 @@
           "description": "View online store products",
           "name": "store.view",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.065Z"
+            "$date": "2026-11-11T19:00:38.251Z"
           }
         },
         {
@@ -974,7 +983,7 @@
           "description": "Add and edit online store products",
           "name": "store.manage",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.212Z"
+            "$date": "2026-11-11T19:00:38.270Z"
           }
         },
         {
@@ -989,7 +998,7 @@
           "description": "Manage online store orders",
           "name": "store.orders",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:47.360Z"
+            "$date": "2026-11-11T19:00:38.281Z"
           }
         },
         {
@@ -1004,7 +1013,7 @@
           "description": "Apply discounts to sales",
           "name": "sales.discount",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.348Z"
+            "$date": "2026-11-11T19:00:37.598Z"
           }
         },
         {
@@ -1019,7 +1028,7 @@
           },
           "description": "Apply wholesale price tiers at POS",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.497Z"
+            "$date": "2026-11-11T19:00:37.605Z"
           }
         },
         {
@@ -1034,7 +1043,7 @@
           },
           "description": "Sell expired stock with a logged override",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.645Z"
+            "$date": "2026-11-11T19:00:37.612Z"
           }
         },
         {
@@ -1049,7 +1058,7 @@
           },
           "description": "View departments",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.793Z"
+            "$date": "2026-11-11T19:00:37.621Z"
           }
         },
         {
@@ -1064,7 +1073,7 @@
           },
           "description": "Create departments",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:38.940Z"
+            "$date": "2026-11-11T19:00:37.630Z"
           }
         },
         {
@@ -1079,7 +1088,7 @@
           },
           "description": "Update departments and assignments",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.087Z"
+            "$date": "2026-11-11T19:00:37.638Z"
           }
         },
         {
@@ -1094,7 +1103,7 @@
           },
           "description": "Deactivate departments",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.235Z"
+            "$date": "2026-11-11T19:00:37.648Z"
           }
         },
         {
@@ -1109,7 +1118,7 @@
           },
           "description": "View attendance records",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.385Z"
+            "$date": "2026-11-11T19:00:37.656Z"
           }
         },
         {
@@ -1124,7 +1133,7 @@
           },
           "description": "Mark and correct attendance",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.531Z"
+            "$date": "2026-11-11T19:00:37.662Z"
           }
         },
         {
@@ -1139,7 +1148,7 @@
           },
           "description": "View salary configuration and payroll",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.678Z"
+            "$date": "2026-11-11T19:00:37.668Z"
           }
         },
         {
@@ -1154,7 +1163,7 @@
           },
           "description": "Configure salaries and finalize payroll",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:39.826Z"
+            "$date": "2026-11-11T19:00:37.675Z"
           }
         },
         {
@@ -1169,7 +1178,7 @@
           },
           "description": "Record Import (China) purchases",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:40.121Z"
+            "$date": "2026-11-11T19:00:37.688Z"
           }
         },
         {
@@ -1184,7 +1193,7 @@
           },
           "description": "View department sales and profit reports",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.179Z"
+            "$date": "2026-11-11T19:00:38.179Z"
           }
         },
         {
@@ -1199,7 +1208,7 @@
           },
           "description": "View stock transfers",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.327Z"
+            "$date": "2026-11-11T19:00:38.204Z"
           }
         },
         {
@@ -1214,7 +1223,7 @@
           },
           "description": "Create stock transfers",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.474Z"
+            "$date": "2026-11-11T19:00:38.215Z"
           }
         },
         {
@@ -1229,7 +1238,7 @@
           },
           "description": "Dispatch stock transfers",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.622Z"
+            "$date": "2026-11-11T19:00:38.221Z"
           }
         },
         {
@@ -1244,7 +1253,7 @@
           },
           "description": "Receive stock transfers",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.769Z"
+            "$date": "2026-11-11T19:00:38.231Z"
           }
         },
         {
@@ -1259,7 +1268,7 @@
           },
           "description": "Cancel stock transfers",
           "updatedAt": {
-            "$date": "2026-11-05T15:29:46.917Z"
+            "$date": "2026-11-11T19:00:38.241Z"
           }
         },
         {
@@ -1274,7 +1283,7 @@
           },
           "description": "View customer bonus balances and ledger",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.866Z"
+            "$date": "2026-11-11T19:00:37.733Z"
           }
         },
         {
@@ -1289,7 +1298,7 @@
           },
           "description": "Redeem customer bonus at POS",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.931Z"
+            "$date": "2026-11-11T19:00:37.746Z"
           }
         },
         {
@@ -1304,7 +1313,7 @@
           },
           "description": "Configure customer bonus rules and rates",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.937Z"
+            "$date": "2026-11-11T19:00:37.755Z"
           }
         },
         {
@@ -1319,7 +1328,7 @@
           },
           "description": "Manually adjust a customer's bonus balance",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.946Z"
+            "$date": "2026-11-11T19:00:37.775Z"
           }
         },
         {
@@ -1334,7 +1343,7 @@
           },
           "description": "View customer bonus reports",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.961Z"
+            "$date": "2026-11-11T19:00:37.787Z"
           }
         },
         {
@@ -1349,7 +1358,7 @@
           },
           "description": "View employee purchases and balances",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.975Z"
+            "$date": "2026-11-11T19:00:37.801Z"
           }
         },
         {
@@ -1364,7 +1373,7 @@
           },
           "description": "Process purchases on behalf of an employee",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:49.991Z"
+            "$date": "2026-11-11T19:00:37.811Z"
           }
         },
         {
@@ -1379,7 +1388,7 @@
           },
           "description": "Apply the employee purchase benefit",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.008Z"
+            "$date": "2026-11-11T19:00:37.819Z"
           }
         },
         {
@@ -1394,7 +1403,7 @@
           },
           "description": "Record employee purchase payments",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.046Z"
+            "$date": "2026-11-11T19:00:37.832Z"
           }
         },
         {
@@ -1409,7 +1418,7 @@
           },
           "description": "Approve employee purchases on credit",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.091Z"
+            "$date": "2026-11-11T19:00:37.848Z"
           }
         },
         {
@@ -1424,7 +1433,7 @@
           },
           "description": "Approve or exclude payroll deductions",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.122Z"
+            "$date": "2026-11-11T19:00:37.858Z"
           }
         },
         {
@@ -1439,7 +1448,7 @@
           },
           "description": "Configure employee benefit rates and limits",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.131Z"
+            "$date": "2026-11-11T19:00:37.865Z"
           }
         },
         {
@@ -1454,7 +1463,37 @@
           },
           "description": "View employee purchase reports",
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.142Z"
+            "$date": "2026-11-11T19:00:37.874Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af47f848026b46ecf9a27d3"
+          },
+          "name": "discounts.view",
+          "__v": 0,
+          "category": "Discounts",
+          "createdAt": {
+            "$date": "2026-11-11T14:45:24.098Z"
+          },
+          "description": "View discount offers",
+          "updatedAt": {
+            "$date": "2026-11-11T19:00:37.530Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af47f848026b46ecf9a27d4"
+          },
+          "name": "discounts.manage",
+          "__v": 0,
+          "category": "Discounts",
+          "createdAt": {
+            "$date": "2026-11-11T14:45:24.262Z"
+          },
+          "description": "Create, edit and stop discount offers",
+          "updatedAt": {
+            "$date": "2026-11-11T19:00:37.537Z"
           }
         }
       ]
@@ -1748,6 +1787,291 @@
               "$oid": "6ae9d69d2402349c63564f51"
             },
             {
+              "$oid": "6aecdc7a5ecf682bcdb5b58d"
+            },
+            {
+              "$oid": "6aecdc7d5ecf682bcdb5b58e"
+            },
+            {
+              "$oid": "6aecdc7e5ecf682bcdb5b58f"
+            },
+            {
+              "$oid": "6aecdc805ecf682bcdb5b590"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b591"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b592"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b593"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b594"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b595"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b596"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b597"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b598"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b599"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59a"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59b"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59c"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59d"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59e"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59f"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a0"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a1"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a2"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a3"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a4"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a5"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a6"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a7"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a8"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a9"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5aa"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ab"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ac"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ad"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ae"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5af"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b0"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b1"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b2"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b3"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b4"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b5"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b6"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b7"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b8"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b9"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5ba"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bb"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bc"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bd"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5be"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5bf"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c0"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c1"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c2"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c3"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c4"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c5"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c6"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c7"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c8"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c9"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ca"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cb"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cc"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cd"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ce"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cf"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d0"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d1"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d2"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d3"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d4"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d5"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d6"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d7"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d8"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5d9"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5da"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5db"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5dc"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5dd"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5de"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5df"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5e0"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e1"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e2"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e3"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e4"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e5"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e6"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e7"
+            },
+            {
+              "$oid": "6af4a348ecda81cf5fbe4374"
+            },
+            {
+              "$oid": "6af4a349ecda81cf5fbe4375"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d3"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d4"
+            },
+            {
               "$oid": "6ae50312119b33925b7ec3be"
             },
             {
@@ -1788,7 +2112,7 @@
             }
           ],
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.605Z"
+            "$date": "2026-11-11T19:00:38.450Z"
           }
         },
         {
@@ -2077,6 +2401,291 @@
               "$oid": "6ae9d69d2402349c63564f51"
             },
             {
+              "$oid": "6aecdc7a5ecf682bcdb5b58d"
+            },
+            {
+              "$oid": "6aecdc7d5ecf682bcdb5b58e"
+            },
+            {
+              "$oid": "6aecdc7e5ecf682bcdb5b58f"
+            },
+            {
+              "$oid": "6aecdc805ecf682bcdb5b590"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b591"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b592"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b593"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b594"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b595"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b596"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b597"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b598"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b599"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a4"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a5"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a6"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a7"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a8"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a9"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5aa"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ab"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d7"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d8"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5d9"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5da"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5db"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59a"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59b"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59c"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59d"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59e"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59f"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a0"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a1"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a2"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a3"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ac"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ae"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ad"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5af"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b0"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b1"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b2"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b3"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b4"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b5"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b6"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b7"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b8"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b9"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5ba"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bb"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bc"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bd"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5be"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5bf"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c0"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c1"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c2"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c3"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c4"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c5"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c6"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c7"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c8"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c9"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ca"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cb"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cc"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cd"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ce"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cf"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d0"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d1"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d2"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d3"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d4"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d5"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d6"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5dc"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5dd"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5de"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5df"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5e0"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e1"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e2"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e3"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e4"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e5"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e6"
+            },
+            {
+              "$oid": "6aecdc8b5ecf682bcdb5b5e7"
+            },
+            {
+              "$oid": "6af4a348ecda81cf5fbe4374"
+            },
+            {
+              "$oid": "6af4a349ecda81cf5fbe4375"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d3"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d4"
+            },
+            {
               "$oid": "6ae50312119b33925b7ec3be"
             },
             {
@@ -2117,7 +2726,7 @@
             }
           ],
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.633Z"
+            "$date": "2026-11-11T19:00:38.484Z"
           }
         },
         {
@@ -2187,6 +2796,60 @@
               "$oid": "6ae9d69d2402349c63564f4a"
             },
             {
+              "$oid": "6aecdc7a5ecf682bcdb5b58d"
+            },
+            {
+              "$oid": "6aecdc7d5ecf682bcdb5b58e"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a4"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59d"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59e"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59f"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a0"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b5a1"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b1"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b2"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b7"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b8"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b6"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5be"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c2"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cc"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cd"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ce"
+            },
+            {
               "$oid": "6ae50312119b33925b7ec3be"
             },
             {
@@ -2203,7 +2866,7 @@
             }
           ],
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.646Z"
+            "$date": "2026-11-05T20:30:17.765Z"
           }
         },
         {
@@ -2298,10 +2961,103 @@
             },
             {
               "$oid": "6ae3a6a919ccfc826b2fd2a3"
+            },
+            {
+              "$oid": "6aecdc7a5ecf682bcdb5b58d"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a4"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d7"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d8"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5d9"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5da"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5db"
+            },
+            {
+              "$oid": "6aecdc7d5ecf682bcdb5b58e"
+            },
+            {
+              "$oid": "6aecdc7e5ecf682bcdb5b58f"
+            },
+            {
+              "$oid": "6aecdc805ecf682bcdb5b590"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b591"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b592"
+            },
+            {
+              "$oid": "6aecdc815ecf682bcdb5b593"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b594"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b595"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59a"
+            },
+            {
+              "$oid": "6aecdc825ecf682bcdb5b59b"
+            },
+            {
+              "$oid": "6aecdc835ecf682bcdb5b59c"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c3"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c4"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c5"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c6"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ac"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ae"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5af"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b0"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d1"
+            },
+            {
+              "$oid": "6af4a348ecda81cf5fbe4374"
+            },
+            {
+              "$oid": "6af4a349ecda81cf5fbe4375"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d3"
+            },
+            {
+              "$oid": "6af47f848026b46ecf9a27d4"
             }
           ],
           "updatedAt": {
-            "$date": "2026-10-29T20:03:53.381Z"
+            "$date": "2026-11-11T19:00:38.512Z"
           }
         },
         {
@@ -2419,6 +3175,108 @@
               "$oid": "6ae9d69d2402349c63564f51"
             },
             {
+              "$oid": "6aecdc7a5ecf682bcdb5b58d"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a4"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5a8"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5aa"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b1"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b4"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b5"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b6"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5b9"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bb"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5bd"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d6"
+            },
+            {
+              "$oid": "6aecdc845ecf682bcdb5b5ac"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5ae"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5af"
+            },
+            {
+              "$oid": "6aecdc855ecf682bcdb5b5b0"
+            },
+            {
+              "$oid": "6aecdc865ecf682bcdb5b5be"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c2"
+            },
+            {
+              "$oid": "6aecdc875ecf682bcdb5b5c3"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c7"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c8"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5c9"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ca"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cb"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cc"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cd"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5ce"
+            },
+            {
+              "$oid": "6aecdc885ecf682bcdb5b5cf"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d2"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d3"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d4"
+            },
+            {
+              "$oid": "6aecdc895ecf682bcdb5b5d5"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5dc"
+            },
+            {
+              "$oid": "6aecdc8a5ecf682bcdb5b5de"
+            },
+            {
               "$oid": "6ae50312119b33925b7ec3be"
             },
             {
@@ -2441,7 +3299,7 @@
             }
           ],
           "updatedAt": {
-            "$date": "2026-11-05T15:34:50.667Z"
+            "$date": "2026-11-05T20:30:17.782Z"
           }
         }
       ]
@@ -2462,7 +3320,7 @@
           },
           "email": "admin@pos.local",
           "lastLoginAt": {
-            "$date": "2026-11-05T15:35:17.736Z"
+            "$date": "2026-11-11T14:47:32.494Z"
           },
           "name": "Store Admin",
           "passwordHash": "$2a$12$CjJlvpnVPPMuEz6o3PMTJ.xduB4ivFVoBEEis.V8/yLEJQy9RRrZm",
@@ -2472,7 +3330,7 @@
           },
           "status": "active",
           "updatedAt": {
-            "$date": "2026-11-05T15:35:17.736Z"
+            "$date": "2026-11-11T14:47:32.495Z"
           },
           "purchaseOutstanding": 0
         },
@@ -4684,6 +5542,1001 @@
       ]
     },
     {
+      "name": "discountoffers",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d272f5ea6e46c214e77"
+          },
+          "name": "Detergent",
+          "percentage": 5,
+          "startDate": {
+            "$date": "2026-11-11T00:00:00Z"
+          },
+          "endDate": {
+            "$date": "2026-11-12T23:59:59.999Z"
+          },
+          "departmentIds": [],
+          "categoryIds": [
+            {
+              "$oid": "6adb08b5b63d2735334df2e4"
+            },
+            {
+              "$oid": "6ac2a638e00b28857878e4fb"
+            },
+            {
+              "$oid": "6ac2a637e00b28857878e4fa"
+            }
+          ],
+          "productIds": [
+            {
+              "$oid": "6ae7725ec26648042ed13230"
+            }
+          ],
+          "status": "active",
+          "note": "",
+          "createdBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:51:51.381Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:55:52.838Z"
+          },
+          "__v": 1
+        }
+      ]
+    },
+    {
+      "name": "cashregisters",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "status": "open",
+          "openCash": 10000,
+          "expectedCash": 10000,
+          "countedCash": null,
+          "difference": null,
+          "openedAt": {
+            "$date": "2026-11-11T16:53:08.973Z"
+          },
+          "closedAt": null,
+          "openedBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "closedBy": null,
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-11T16:53:08.975Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:08.975Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "purchases",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "locationType": "shop",
+          "warehouseId": null,
+          "supplierId": {
+            "$oid": "6ac6aceb6f04f62ff961697c"
+          },
+          "purchaseNumber": "PUR-2026-11-CZQ0QU",
+          "purchaseSource": "local",
+          "departmentId": null,
+          "departmentName": "Shop",
+          "status": "pending",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 10,
+              "purchasePrice": 200,
+              "sellingPrice": 220,
+              "costPrice": 0,
+              "discount": 0,
+              "tax": 0,
+              "subtotal": 2000,
+              "batchNumber": "",
+              "expirationDate": null,
+              "_id": {
+                "$oid": "6af49d202f5ea6e46c214e70"
+              }
+            }
+          ],
+          "subtotal": 2000,
+          "discount": 0,
+          "tax": 0,
+          "total": 2000,
+          "paidAmount": 1000,
+          "dueAmount": 1000,
+          "paymentMethod": "cash",
+          "createdBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-11T16:51:44.898Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:44.898Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49eef2f5ea6e46c214e9c"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "locationType": "warehouse",
+          "warehouseId": {
+            "$oid": "6ae75715c26648042ed131e5"
+          },
+          "supplierId": {
+            "$oid": "6ac6aceb6f04f62ff961697c"
+          },
+          "purchaseNumber": "PUR-2026-11-ABRLAH",
+          "purchaseSource": "local",
+          "departmentId": null,
+          "departmentName": "Shop",
+          "status": "pending",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 9,
+              "purchasePrice": 200,
+              "sellingPrice": 220,
+              "costPrice": 0,
+              "discount": 0,
+              "tax": 0,
+              "subtotal": 1800,
+              "batchNumber": "",
+              "expirationDate": null,
+              "_id": {
+                "$oid": "6af49eef2f5ea6e46c214e9d"
+              }
+            }
+          ],
+          "subtotal": 1800,
+          "discount": 0,
+          "tax": 0,
+          "total": 1800,
+          "paidAmount": 0,
+          "dueAmount": 1800,
+          "paymentMethod": "cash",
+          "createdBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-11T16:59:27.047Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:59:27.047Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "inventorymovements",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d212f5ea6e46c214e71"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "PURCHASE_IN",
+          "quantity": 10,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": "local",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "note": "Purchase PUR-2026-11-CZQ0QU",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:51:45.445Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:45.445Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d802f5ea6e46c214e7f"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "SALE_OUT",
+          "quantity": 1,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": "local",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af49d802f5ea6e46c214e7c"
+          },
+          "note": "Sale INV-202611-000001",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "__v": 0,
+          "createdAt": {
+            "$date": "2026-11-11T16:53:20.780Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:20.780Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af49dc52f5ea6e46c214e87"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "CUSTOMER_RETURN_IN",
+          "quantity": 1,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": null,
+          "referenceType": "return",
+          "referenceId": {
+            "$oid": "6af49dc42f5ea6e46c214e85"
+          },
+          "note": "Return RET-202611-16068846 for INV-202611-000001",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "__v": 0,
+          "createdAt": {
+            "$date": "2026-11-11T16:54:29.123Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:54:29.123Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af49e7c2f5ea6e46c214e90"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "SALE_OUT",
+          "quantity": 1,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": "local",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af49e7c2f5ea6e46c214e8d"
+          },
+          "note": "Sale INV-202611-000002",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "__v": 0,
+          "createdAt": {
+            "$date": "2026-11-11T16:57:32.283Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:32.283Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af49e972f5ea6e46c214e97"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "warehouseId": null,
+          "movementType": "CUSTOMER_RETURN_IN",
+          "quantity": 1,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": null,
+          "referenceType": "return",
+          "referenceId": {
+            "$oid": "6af49e972f5ea6e46c214e95"
+          },
+          "note": "Return RET-202611-16279366 for INV-202611-000002",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "__v": 0,
+          "createdAt": {
+            "$date": "2026-11-11T16:57:59.412Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:59.412Z"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6af49eef2f5ea6e46c214e9e"
+          },
+          "productId": {
+            "$oid": "6ae7725ec26648042ed13230"
+          },
+          "branchId": null,
+          "warehouseId": {
+            "$oid": "6ae75715c26648042ed131e5"
+          },
+          "movementType": "PURCHASE_IN",
+          "quantity": 9,
+          "unitCost": 200,
+          "batchNumber": "",
+          "expirationDate": null,
+          "purchaseSource": "local",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49eef2f5ea6e46c214e9c"
+          },
+          "note": "Purchase PUR-2026-11-ABRLAH",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:59:27.111Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:59:27.111Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "sales",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d802f5ea6e46c214e7c"
+          },
+          "invoiceNumber": "INV-202611-000001",
+          "clientTransactionId": "f24c7a02-1cfc-4d14-818a-bfbb2c19785f",
+          "deviceId": null,
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "customerId": null,
+          "cashierId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "employeeId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "departmentId": null,
+          "departmentName": "",
+          "status": "completed",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "itemType": "inventory",
+              "pricingMode": "retail",
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 1,
+              "sellingPrice": 220,
+              "costPrice": 200,
+              "discount": 11,
+              "tax": 0,
+              "subtotal": 209,
+              "purchaseSource": "local",
+              "departmentId": null,
+              "departmentName": "",
+              "_id": {
+                "$oid": "6af49d802f5ea6e46c214e7d"
+              }
+            }
+          ],
+          "subtotal": 220,
+          "discount": 11,
+          "discountType": "amount",
+          "tax": 0,
+          "total": 209,
+          "paidAmount": 209,
+          "changeAmount": 0,
+          "paymentMethod": "cash",
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 209,
+              "reference": "",
+              "_id": {
+                "$oid": "6af49d802f5ea6e46c214e7e"
+              }
+            }
+          ],
+          "pricingMode": "retail",
+          "bonusPercent": 0,
+          "bonusEarned": 0,
+          "bonusRedeemed": 0,
+          "bonusEarnBase": 0,
+          "bonusGranted": true,
+          "originalSaleId": null,
+          "exchangeReturnId": null,
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "heldAt": null,
+          "heldBy": null,
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-11T16:53:20.604Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:20.604Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e7c2f5ea6e46c214e8d"
+          },
+          "invoiceNumber": "INV-202611-000002",
+          "clientTransactionId": "fc9f6cfa-70cf-4034-9399-038552f2a95f",
+          "deviceId": null,
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "customerId": null,
+          "cashierId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "employeeId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "departmentId": null,
+          "departmentName": "",
+          "status": "completed",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "itemType": "inventory",
+              "pricingMode": "retail",
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 1,
+              "sellingPrice": 220,
+              "costPrice": 200,
+              "discount": 11,
+              "tax": 0,
+              "subtotal": 209,
+              "purchaseSource": "local",
+              "departmentId": null,
+              "departmentName": "",
+              "_id": {
+                "$oid": "6af49e7c2f5ea6e46c214e8e"
+              }
+            }
+          ],
+          "subtotal": 220,
+          "discount": 11,
+          "discountType": "amount",
+          "tax": 0,
+          "total": 209,
+          "paidAmount": 209,
+          "changeAmount": 0,
+          "paymentMethod": "cash",
+          "payments": [
+            {
+              "method": "cash",
+              "amount": 209,
+              "reference": "",
+              "_id": {
+                "$oid": "6af49e7c2f5ea6e46c214e8f"
+              }
+            }
+          ],
+          "pricingMode": "retail",
+          "bonusPercent": 0,
+          "bonusEarned": 0,
+          "bonusRedeemed": 0,
+          "bonusEarnBase": 0,
+          "bonusGranted": true,
+          "originalSaleId": null,
+          "exchangeReturnId": null,
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "heldAt": null,
+          "heldBy": null,
+          "note": "",
+          "createdAt": {
+            "$date": "2026-11-11T16:57:32.248Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:32.248Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "salereturns",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49dc42f5ea6e46c214e85"
+          },
+          "returnNumber": "RET-202611-16068846",
+          "saleId": {
+            "$oid": "6af49d802f5ea6e46c214e7c"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "customerId": null,
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "employeeId": null,
+          "departmentId": null,
+          "departmentName": "",
+          "status": "approved",
+          "clientTransactionId": "1e90773c-4935-434f-9224-234721985a63",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "itemType": "inventory",
+              "sourceLineId": "6af49d802f5ea6e46c214e7d",
+              "restock": true,
+              "pricingMode": "retail",
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 1,
+              "sellingPrice": 220,
+              "costPrice": 200,
+              "discount": 11,
+              "tax": 0,
+              "subtotal": 209,
+              "departmentId": null,
+              "departmentName": "",
+              "_id": {
+                "$oid": "6af49dc42f5ea6e46c214e86"
+              }
+            }
+          ],
+          "subtotal": 209,
+          "discount": 0,
+          "tax": 0,
+          "total": 209,
+          "refundMethod": "cash",
+          "reason": "Customer returned it — changed their mind",
+          "note": "",
+          "exchangeSaleId": null,
+          "replacementTotal": 0,
+          "netAmount": -209,
+          "bonusReversed": 0,
+          "bonusRestored": 0,
+          "approvedBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "approvedAt": {
+            "$date": "2026-11-11T16:54:28.846Z"
+          },
+          "rejectedAt": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:54:28.878Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:54:28.878Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e972f5ea6e46c214e95"
+          },
+          "returnNumber": "RET-202611-16279366",
+          "saleId": {
+            "$oid": "6af49e7c2f5ea6e46c214e8d"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "customerId": null,
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "employeeId": null,
+          "departmentId": null,
+          "departmentName": "",
+          "status": "approved",
+          "clientTransactionId": "bc013c22-0140-4749-ae4b-de7c9d97915b",
+          "items": [
+            {
+              "productId": {
+                "$oid": "6ae7725ec26648042ed13230"
+              },
+              "itemType": "inventory",
+              "sourceLineId": "6af49e7c2f5ea6e46c214e8e",
+              "restock": true,
+              "pricingMode": "retail",
+              "name": "Axe spray",
+              "sku": "1256",
+              "quantity": 1,
+              "sellingPrice": 220,
+              "costPrice": 200,
+              "discount": 11,
+              "tax": 0,
+              "subtotal": 209,
+              "departmentId": null,
+              "departmentName": "",
+              "_id": {
+                "$oid": "6af49e972f5ea6e46c214e96"
+              }
+            }
+          ],
+          "subtotal": 209,
+          "discount": 0,
+          "tax": 0,
+          "total": 209,
+          "refundMethod": "cash",
+          "reason": "Customer returned it — changed their mind",
+          "note": "",
+          "exchangeSaleId": null,
+          "replacementTotal": 0,
+          "netAmount": -209,
+          "bonusReversed": 0,
+          "bonusRestored": 0,
+          "approvedBy": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "approvedAt": {
+            "$date": "2026-11-11T16:57:59.366Z"
+          },
+          "rejectedAt": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:57:59.382Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:59.382Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "suppliertransactions",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d212f5ea6e46c214e72"
+          },
+          "supplierId": {
+            "$oid": "6ac6aceb6f04f62ff961697c"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "purchase",
+          "amount": 2000,
+          "balanceAfter": 2000,
+          "method": "",
+          "reference": "",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "description": "Purchase PUR-2026-11-CZQ0QU",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:51:45.650Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:45.650Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d222f5ea6e46c214e74"
+          },
+          "supplierId": {
+            "$oid": "6ac6aceb6f04f62ff961697c"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "payment",
+          "amount": -1000,
+          "balanceAfter": 1000,
+          "method": "cash",
+          "reference": "PUR-2026-11-CZQ0QU",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "description": "Payment for purchase PUR-2026-11-CZQ0QU",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:51:46.096Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:46.096Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49eef2f5ea6e46c214e9f"
+          },
+          "supplierId": {
+            "$oid": "6ac6aceb6f04f62ff961697c"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "purchase",
+          "amount": 1800,
+          "balanceAfter": 2800,
+          "method": "",
+          "reference": "",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49eef2f5ea6e46c214e9c"
+          },
+          "description": "Purchase PUR-2026-11-ABRLAH",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:59:27.208Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:59:27.208Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "cashtransactions",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d752f5ea6e46c214e7a"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "opening",
+          "amount": 10000,
+          "description": "Opening cash",
+          "referenceType": null,
+          "referenceId": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:53:09.086Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:09.086Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d802f5ea6e46c214e80"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "sale",
+          "amount": 209,
+          "description": "Sale INV-202611-000001",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af49d802f5ea6e46c214e7c"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:53:20.819Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:20.819Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49dc52f5ea6e46c214e88"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "refund",
+          "amount": -209,
+          "description": "Refund RET-202611-16068846 for INV-202611-000001",
+          "referenceType": "sale_return",
+          "referenceId": {
+            "$oid": "6af49dc42f5ea6e46c214e85"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:54:29.248Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:54:29.248Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e7c2f5ea6e46c214e91"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "sale",
+          "amount": 209,
+          "description": "Sale INV-202611-000002",
+          "referenceType": "sale",
+          "referenceId": {
+            "$oid": "6af49e7c2f5ea6e46c214e8d"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:57:32.317Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:32.317Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e972f5ea6e46c214e98"
+          },
+          "registerId": {
+            "$oid": "6af49d742f5ea6e46c214e79"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "type": "refund",
+          "amount": -209,
+          "description": "Refund RET-202611-16279366 for INV-202611-000002",
+          "referenceType": "sale_return",
+          "referenceId": {
+            "$oid": "6af49e972f5ea6e46c214e95"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:57:59.451Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:59.451Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
+      "name": "payments",
+      "docs": [
+        {
+          "_id": {
+            "$oid": "6af49d212f5ea6e46c214e73"
+          },
+          "type": "purchase",
+          "referenceType": "purchase",
+          "referenceId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "amount": 1000,
+          "method": "cash",
+          "description": "Payment for purchase PUR-2026-11-CZQ0QU",
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "createdAt": {
+            "$date": "2026-11-11T16:51:45.770Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:45.770Z"
+          },
+          "__v": 0
+        }
+      ]
+    },
+    {
       "name": "auditlogs",
       "docs": [
         {
@@ -4923,6 +6776,285 @@
           },
           "updatedAt": {
             "$date": "2026-11-03T12:57:58.860Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d222f5ea6e46c214e75"
+          },
+          "action": "cash_movement_without_register",
+          "entityType": "CashTransaction",
+          "entityId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {},
+          "ip": null,
+          "userAgent": null,
+          "note": "expense -1000 — Purchase payment PUR-2026-11-CZQ0QU (no open register)",
+          "createdAt": {
+            "$date": "2026-11-11T16:51:46.185Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:46.185Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d222f5ea6e46c214e76"
+          },
+          "action": "purchase.create",
+          "entityType": "Purchase",
+          "entityId": {
+            "$oid": "6af49d202f5ea6e46c214e6f"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "purchaseNumber": "PUR-2026-11-CZQ0QU",
+                "total": 2000,
+                "supplierId": "6ac6aceb6f04f62ff961697c",
+                "purchaseSource": "local",
+                "receiveInto": "Shop",
+                "locationType": "shop",
+                "departmentName": "Shop",
+                "items": 1
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:51:46.368Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:51:46.368Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49d802f5ea6e46c214e81"
+          },
+          "action": "sale.create",
+          "entityType": "Sale",
+          "entityId": {
+            "$oid": "6af49d802f5ea6e46c214e7c"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "invoiceNumber": "INV-202611-000001",
+                "total": 209,
+                "paidAmount": 209,
+                "creditUsed": 0,
+                "pricingMode": "retail",
+                "wholesaleItems": 0,
+                "bonusGranted": true,
+                "bonusEarned": 0,
+                "bonusRedeemed": 0,
+                "directItems": 0,
+                "expiredOverride": false
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:53:20.853Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:53:20.853Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49dc52f5ea6e46c214e89"
+          },
+          "action": "sale_return.refund",
+          "entityType": "SaleReturn",
+          "entityId": {
+            "$oid": "6af49dc42f5ea6e46c214e85"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "returnNumber": "RET-202611-16068846",
+                "saleId": "6af49d802f5ea6e46c214e7c",
+                "refundAmount": 209,
+                "replacementTotal": 0,
+                "netAmount": -209,
+                "replacementSaleId": null,
+                "bonusReversed": 0,
+                "clientTransactionId": "1e90773c-4935-434f-9224-234721985a63"
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": "POS refund: Customer returned it — changed their mind",
+          "createdAt": {
+            "$date": "2026-11-11T16:54:29.365Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:54:29.365Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e7c2f5ea6e46c214e92"
+          },
+          "action": "sale.create",
+          "entityType": "Sale",
+          "entityId": {
+            "$oid": "6af49e7c2f5ea6e46c214e8d"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "invoiceNumber": "INV-202611-000002",
+                "total": 209,
+                "paidAmount": 209,
+                "creditUsed": 0,
+                "pricingMode": "retail",
+                "wholesaleItems": 0,
+                "bonusGranted": true,
+                "bonusEarned": 0,
+                "bonusRedeemed": 0,
+                "directItems": 0,
+                "expiredOverride": false
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:57:32.351Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:32.351Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49e972f5ea6e46c214e99"
+          },
+          "action": "sale_return.refund",
+          "entityType": "SaleReturn",
+          "entityId": {
+            "$oid": "6af49e972f5ea6e46c214e95"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "returnNumber": "RET-202611-16279366",
+                "saleId": "6af49e7c2f5ea6e46c214e8d",
+                "refundAmount": 209,
+                "replacementTotal": 0,
+                "netAmount": -209,
+                "replacementSaleId": null,
+                "bonusReversed": 0,
+                "clientTransactionId": "bc013c22-0140-4749-ae4b-de7c9d97915b"
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": "POS refund: Customer returned it — changed their mind",
+          "createdAt": {
+            "$date": "2026-11-11T16:57:59.515Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:57:59.515Z"
+          },
+          "__v": 0
+        },
+        {
+          "_id": {
+            "$oid": "6af49eef2f5ea6e46c214ea0"
+          },
+          "action": "purchase.create",
+          "entityType": "Purchase",
+          "entityId": {
+            "$oid": "6af49eef2f5ea6e46c214e9c"
+          },
+          "userId": {
+            "$oid": "6ac2a635e00b28857878e4f6"
+          },
+          "branchId": {
+            "$oid": "6ac2a632e00b28857878e4f5"
+          },
+          "changes": {
+            "value": {
+              "before": null,
+              "after": {
+                "purchaseNumber": "PUR-2026-11-ABRLAH",
+                "total": 1800,
+                "supplierId": "6ac6aceb6f04f62ff961697c",
+                "purchaseSource": "local",
+                "receiveInto": "Main Warehouse",
+                "locationType": "warehouse",
+                "departmentName": "Shop",
+                "items": 1
+              }
+            }
+          },
+          "ip": "::1",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          "note": null,
+          "createdAt": {
+            "$date": "2026-11-11T16:59:27.247Z"
+          },
+          "updatedAt": {
+            "$date": "2026-11-11T16:59:27.247Z"
           },
           "__v": 0
         }

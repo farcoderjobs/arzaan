@@ -8,11 +8,14 @@ import { error } from "@/utils/toast";
 import { cn } from "@/utils/classname";
 import { Printer, RefreshCw } from "@/components/ui/icons";
 import { money } from "@/lib/currency";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 interface SaleDetailClientProps {
   saleId: string;
   canRefund: boolean;
   canSeeCost: boolean;
+  /** Store logo printed on the receipt; empty falls back to the bundled logo. */
+  logoUrl: string;
 }
 
 interface SaleItem {
@@ -77,7 +80,7 @@ interface SaleData {
   branchPhone: string;
 }
 
-export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailClientProps) {
+export function SaleDetailClient({ saleId, canRefund, canSeeCost, logoUrl }: SaleDetailClientProps) {
   const [loading, setLoading] = useState(true);
   const [sale, setSale] = useState<SaleData | null>(null);
   const [returns, setReturns] = useState<SaleReturnRow[]>([]);
@@ -322,6 +325,12 @@ export function SaleDetailClient({ saleId, canRefund, canSeeCost }: SaleDetailCl
       {/* ============ PRINTABLE RECEIPT (hidden on screen, shown on print) ============ */}
       <div className="print-only mx-auto max-w-[80mm] bg-white p-4 text-[12px] leading-relaxed text-black">
         <div className="text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoUrl || DEFAULT_LOGO_URL}
+            alt=""
+            className="mx-auto mb-1 max-h-16 w-auto max-w-[70%] object-contain"
+          />
           <p className="text-base font-bold uppercase">{sale.branchName || "POS Store"}</p>
           {sale.branchAddress && <p>{sale.branchAddress}</p>}
           {sale.branchPhone && <p>Tel: {sale.branchPhone}</p>}

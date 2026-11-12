@@ -1,4 +1,5 @@
 import { money } from "@/lib/currency";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 /**
  * Printable receipt used by the POS (online + offline) and rendered only when
@@ -24,6 +25,8 @@ export interface ReceiptData {
   invoiceNumber: string;
   createdAt: string;
   storeName: string;
+  /** Store logo; falls back to the bundled logo when empty. */
+  logoUrl?: string;
   address: string;
   phone: string;
   cashierName: string;
@@ -58,6 +61,12 @@ export function PrintableReceipt({ data }: { data: ReceiptData }) {
   return (
     <div className="print-only mx-auto max-w-[80mm] bg-white p-4 text-[12px] leading-relaxed text-black">
       <div className="text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={data.logoUrl || DEFAULT_LOGO_URL}
+          alt=""
+          className="mx-auto mb-1 max-h-16 w-auto max-w-[70%] object-contain"
+        />
         <p className="text-base font-bold uppercase">{data.storeName || "POS Store"}</p>
         {data.address && <p>{data.address}</p>}
         {data.phone && <p>Tel: {data.phone}</p>}

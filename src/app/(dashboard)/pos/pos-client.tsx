@@ -45,6 +45,8 @@ interface PosClientProps {
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  /** Store logo printed on receipts; empty falls back to the bundled logo. */
+  logoUrl: string;
 }
 
 interface PosProduct {
@@ -238,6 +240,7 @@ export function PosClient({
   storeName,
   storeAddress,
   storePhone,
+  logoUrl,
 }: PosClientProps) {
   const tr = useT();
   // Catalog state
@@ -975,6 +978,7 @@ export function PosClient({
           invoiceNumber: data.data.invoiceNumber,
           createdAt: new Date().toISOString(),
           storeName,
+          logoUrl,
           address: storeAddress,
           phone: storePhone,
           cashierName: userName,
