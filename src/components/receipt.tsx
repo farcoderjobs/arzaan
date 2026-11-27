@@ -18,6 +18,8 @@ export interface ReceiptItem {
   direct?: boolean;
   /** Catalog tier charged for the line. */
   pricingMode?: "retail" | "wholesale";
+  /** Flavour/variant of the scanned barcode on this line. */
+  flavour?: string;
 }
 
 export interface ReceiptData {
@@ -123,6 +125,7 @@ export function PrintableReceipt({ data }: { data: ReceiptData }) {
             <tr key={`${item.sku}-${i}`} className="align-top">
               <td>
                 {item.name}
+                {item.flavour && <span className="block text-[10px] italic">{item.flavour}</span>}
                 {item.direct && <span className="block text-[10px] font-semibold">direct sale</span>}
                 {item.pricingMode === "wholesale" && <span className="block text-[10px] font-semibold">wholesale price</span>}
                 {item.discount > 0 && <span className="block text-[10px]">disc −{money(item.discount)}</span>}

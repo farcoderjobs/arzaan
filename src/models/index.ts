@@ -101,6 +101,7 @@ export type IBrandDocument = Document & {
  */
 export type IProductBarcode = {
   code: string;
+  /** Flavour/variant label shown at the POS and stored on sale lines. */
   label: string;
 };
 
@@ -109,7 +110,9 @@ export type IProductDocument = Document & {
   sku: string;
   /** Primary barcode — kept for backward compatibility with existing rows. */
   barcode: string;
-  /** Extra unique barcodes for the same sellable product. */
+  /** Flavour/variant label of the primary barcode ("" when unlabelled). */
+  barcodeLabel: string;
+  /** Extra unique barcodes for the same sellable product (shared inventory). */
   barcodes: IProductBarcode[];
   description: string;
   categoryId: mongoose.Types.ObjectId;
@@ -131,6 +134,8 @@ export type IProductDocument = Document & {
   variantName: string;
   status: "active" | "inactive" | "archived";
   branchId: mongoose.Types.ObjectId | null;
+  /** Incremented inside the checkout transaction as a stock concurrency guard. */
+  stockVersion: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -181,6 +186,10 @@ export type ISaleItemSnapshot = {
   itemType: SaleItemType;
   /** Price tier charged for this line (direct lines use the negotiated price). */
   pricingMode: SalePricingMode;
+  /** Barcode that was scanned for this line ("" = picked without a scan). */
+  barcode: string;
+  /** Flavour/variant label of that barcode, snapshotted at sale time. */
+  flavour: string;
   name: string;
   sku: string;
   quantity: number;
@@ -277,6 +286,9 @@ export type IPurchaseItemSnapshot = {
   subtotal: number;
   batchNumber?: string;
   expirationDate?: Date | null;
+  /** Barcode/flavour the stock was bought for (reporting only — shared stock). */
+  barcode?: string;
+  flavour?: string;
 };
 
 export type IPurchaseDocument = Document & {
@@ -527,6 +539,9 @@ export type ISaleReturnItemSnapshot = {
   discount: number;
   tax: number;
   subtotal: number;
+  /** Barcode/flavour of the returned line, preserved from the original sale. */
+  barcode: string;
+  flavour: string;
   /** Department snapshot copied from the returned sale line. */
   departmentId: mongoose.Types.ObjectId | null;
   departmentName: string;
@@ -1100,6 +1115,9 @@ export const ProductSchema = new Schema<IProductDocument>(
     // would E11000 against each other. Leaving the path unset lets the sparse
     // index skip those documents.
     barcode: { type: String, trim: true },
+    // Flavour/variant label belonging to the primary barcode. Extra barcodes
+    // carry their own label inside `barcodes`.
+    barcodeLabel: { type: String, default: "", trim: true, maxlength: 80 },
     // Extra barcodes live in a separate array so the legacy single `barcode`
     // field keeps working untouched. Uniqueness is enforced in application
     // code across BOTH fields (one barcode = one sellable product/variant).
@@ -1137,6 +1155,10 @@ export const ProductSchema = new Schema<IProductDocument>(
     variantName: { type: String, default: "", trim: true },
     status: { type: String, enum: ["active", "inactive", "archived"], default: "active" },
     branchId: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
+    // Concurrency guard for shared stock. Checkout touches this field inside
+    // its transaction so two registers selling the same product serialise
+    // instead of both passing the stock check and overselling.
+    stockVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -1216,6 +1238,10 @@ export const SaleSchema = new Schema<ISaleDocument>(
         productId: { type: Schema.Types.ObjectId, ref: "Product", default: null },
         itemType: { type: String, enum: ["inventory", "direct"], default: "inventory" },
         pricingMode: { type: String, enum: ["retail", "wholesale"], default: "retail" },
+        // Scanned barcode + flavour are snapshotted so reports/returns keep the
+        // exact variant that was sold even if the product is edited later.
+        barcode: { type: String, default: "", trim: true },
+        flavour: { type: String, default: "", trim: true },
         name: { type: String, required: true },
         sku: { type: String, required: true },
         quantity: { type: Number, required: true, min: 0 },
@@ -1280,6 +1306,8 @@ SaleSchema.index(
   { unique: true, partialFilterExpression: { clientTransactionId: { $type: "string" } } }
 );
 SaleSchema.index({ "items.productId": 1 });
+// Barcode-wise sales reporting / refunds by scanned code.
+SaleSchema.index({ "items.barcode": 1 });
 
 export const PurchaseSchema = new Schema<IPurchaseDocument>(
   {
@@ -1316,6 +1344,10 @@ export const PurchaseSchema = new Schema<IPurchaseDocument>(
         subtotal: { type: Number, required: true, min: 0 },
         batchNumber: { type: String, default: "", trim: true },
         expirationDate: { type: Date, default: null },
+        // Reporting only: the flavour/barcode this stock was bought for. The
+        // quantity still lands on the parent product's single stock pool.
+        barcode: { type: String, default: "", trim: true },
+        flavour: { type: String, default: "", trim: true },
       },
     ],
     subtotal: { type: Number, default: 0, min: 0 },
@@ -1587,6 +1619,8 @@ export const SaleReturnSchema = new Schema<ISaleReturnDocument>(
         sourceLineId: { type: String, default: "" },
         restock: { type: Boolean, default: true },
         pricingMode: { type: String, enum: ["retail", "wholesale"], default: "retail" },
+        barcode: { type: String, default: "", trim: true },
+        flavour: { type: String, default: "", trim: true },
         name: { type: String, required: true },
         sku: { type: String, required: true },
         quantity: { type: Number, required: true, min: 0 },

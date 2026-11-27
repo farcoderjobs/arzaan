@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { z } from "zod";
 import { success, badRequest, forbidden, notFound } from "@/lib/api";
 import mongoose from "mongoose";
+import { normalizeBarcodeAssignments } from "@/lib/product-barcodes";
 
 const barcodeEntrySchema = z.object({
   code: z.string().trim().min(1, "Barcode is required"),
@@ -17,6 +18,8 @@ const createSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   sku: z.string().min(1, "SKU is required"),
   barcode: z.string().optional(),
+  /** Flavour/variant label of the primary barcode. */
+  barcodeLabel: z.string().trim().max(80).optional(),
   /** Extra barcodes (flavours / packaging variants of the same sellable product). */
   barcodes: z.array(barcodeEntrySchema).max(50).optional(),
   // Expiry and variant fields belong to the Purchases module only: products are
@@ -48,19 +51,6 @@ const saveSchema = createSchema.extend({
  * a bare 500. Catches races the pre-insert uniqueness checks cannot (e.g. two
  * submits of the same SKU/barcode at once).
  */
-/** Normalizes + de-duplicates the extra barcode list. */
-function normalizeBarcodes(entries: Array<{ code: string; label: string }> | undefined) {
-  const seen = new Set<string>();
-  const result: Array<{ code: string; label: string }> = [];
-  for (const entry of entries ?? []) {
-    const code = entry.code.trim().toUpperCase();
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    result.push({ code, label: entry.label.trim() });
-  }
-  return result;
-}
-
 /**
  * One barcode may identify only one product/variant. Checks both the primary
  * `barcode` field and every entry of the `barcodes` array of other products.
@@ -116,7 +106,9 @@ export async function GET(req: NextRequest) {
           { name: { $regex: search, $options: "i" } },
           { sku: { $regex: search, $options: "i" } },
           { barcode: { $regex: search, $options: "i" } },
+          { barcodeLabel: { $regex: search, $options: "i" } },
           { "barcodes.code": { $regex: search, $options: "i" } },
+          { "barcodes.label": { $regex: search, $options: "i" } },
         ],
       };
     }
@@ -179,9 +171,20 @@ export async function POST(req: NextRequest) {
 
     const data = parsed.data;
     const isUpdate = Boolean(data.id);
-    const now = new Date();
 
-    const barcodes = normalizeBarcodes(data.barcodes);
+    const primaryBarcode = data.barcode?.trim().toUpperCase() ?? "";
+    const { entries: barcodes, duplicate } = normalizeBarcodeAssignments(
+      primaryBarcode,
+      data.barcodes
+    );
+    if (duplicate) {
+      return NextResponse.json(
+        badRequest(`Barcode ${duplicate} appears more than once`, {
+          barcodes: `Barcode ${duplicate} appears more than once`,
+        }),
+        { status: 400 }
+      );
+    }
 
     if (!isUpdate) {
       // Create
@@ -234,7 +237,8 @@ export async function POST(req: NextRequest) {
         // barcode index treats "" as a value, so two products without a
         // barcode would collide with E11000 (surfaced as a 500). Leaving the
         // path undefined omits the field and the sparse index skips it.
-        barcode: data.barcode?.trim().toUpperCase() || undefined,
+        barcode: primaryBarcode || undefined,
+        barcodeLabel: data.barcodeLabel?.trim() ?? "",
         barcodes,
         categoryId: data.categoryId as unknown as mongoose.Types.ObjectId,
         brandId: (data.brandId || null) as unknown as mongoose.Types.ObjectId | null,
@@ -284,7 +288,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(badRequest("Another product with this SKU already exists"), { status: 400 });
       }
     }
-    const normalizedBarcode = data.barcode?.trim().toUpperCase() ?? "";
+    const normalizedBarcode = primaryBarcode;
     if (normalizedBarcode && normalizedBarcode !== ((product.barcode ?? "").toUpperCase())) {
       const conflict = await findBarcodeConflict(normalizedBarcode, product._id.toString());
       if (conflict) {
@@ -308,7 +312,8 @@ export async function POST(req: NextRequest) {
     product.sku = data.sku.trim().toUpperCase();
     // Same sparse-index rule as create: clearing the barcode unsets the field
     // instead of storing "" (which would collide with other barcode-less rows).
-    product.set("barcode", data.barcode?.trim().toUpperCase() || undefined);
+    product.set("barcode", primaryBarcode || undefined);
+    if (data.barcodeLabel !== undefined) product.set("barcodeLabel", data.barcodeLabel.trim());
     // Only touch the barcode list when the caller actually sent one — editing
     // name/price from the product form must not wipe extra barcodes.
     if (data.barcodes !== undefined) product.barcodes = barcodes;

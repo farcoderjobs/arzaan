@@ -29,6 +29,8 @@ import {
 import { allocateQuantity, sellableQuantity, expiredQuantity } from "@/lib/expiry";
 import { getProductBatches } from "@/lib/inventory-batches";
 import { resolveOfferDiscountsForProducts } from "@/lib/discounts";
+import { normalizeBarcode } from "@/lib/barcode";
+import { resolveScannedBarcode } from "@/lib/product-barcodes";
 import { appendLedgerEntry } from "@/lib/customer-ledger";
 import { appendBonusEntry, expireCustomerBonus } from "@/lib/bonus";
 import { generateDocumentNumber } from "@/lib/document-number";
@@ -65,7 +67,16 @@ export type CompleteSaleInput = {
   customerId: string | null;
   cashierId: string;
   /** Each line carries its own price tier; omitted lines use the sale tier. */
-  items: Array<{ productId: string; quantity: number; unitDiscount: number; pricingMode?: SalePricingMode }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    unitDiscount: number;
+    pricingMode?: SalePricingMode;
+    /** Scanned barcode, validated against the product on the server. */
+    barcode?: string;
+    /** Flavour label of that barcode, snapshotted from the catalog. */
+    flavour?: string;
+  }>;
   /** Goods bought in the market — priced server-side, never touch stock. */
   directItems?: DirectItemInput[];
   discount: number;
@@ -154,6 +165,9 @@ type LeanProduct = {
   sellingPrice: number;
   discountPrice: number;
   taxRate: number;
+  barcode?: string;
+  barcodeLabel?: string;
+  barcodes?: Array<{ code: string; label?: string }>;
 };
 
 type PreparedTotals = {
@@ -163,6 +177,9 @@ type PreparedTotals = {
     /** Department of the sold product, snapshotted for the department report. */
     departmentId: string | null;
     departmentName: string;
+    /** Barcode/flavour scanned for this line ("" when picked without a scan). */
+    barcode: string;
+    flavour: string;
   }) | {
     productId: null;
     itemType: "direct";
@@ -300,14 +317,46 @@ export async function prepareSale(
     }
   }
 
-  // 2. Verify stock from movements
+  // 1b. A scanned barcode must belong to the product being sold. The flavour
+  // is re-read from the catalog (the client value is only a fallback) so a sale
+  // can never file revenue under another product's flavour.
+  for (const item of input.items) {
+    const product = productMap.get(item.productId)!;
+    const supplied = normalizeBarcode(item.barcode ?? "");
+    if (supplied) {
+      const resolved = resolveScannedBarcode(product, supplied);
+      if (!resolved) {
+        throw new SaleValidationError(
+          "BARCODE_NOT_ON_PRODUCT",
+          `Barcode ${supplied} is not registered for ${product.name}`
+        );
+      }
+      item.barcode = resolved.code;
+      item.flavour = resolved.flavour || (item.flavour ?? "").trim();
+    } else {
+      item.barcode = "";
+      item.flavour = (item.flavour ?? "").trim();
+    }
+  }
+
+  // 2. Verify stock from movements. All barcodes/flavours of a product share
+  // one inventory row, so validate the TOTAL quantity per product rather than
+  // each cart line in isolation (which would allow overselling by splitting a
+  // flavour across several lines).
+  const requestedByProduct = new Map<string, number>();
+  for (const item of input.items) {
+    requestedByProduct.set(
+      item.productId,
+      (requestedByProduct.get(item.productId) ?? 0) + item.quantity
+    );
+  }
   const stockMap = await getStockForProductsInSession(productIds, branchIdOrNull(input.branchId), session);
   const batchMap = await getProductBatches(productIds, branchIdOrNull(input.branchId), session);
   let expiredOverrideUsed = false;
-  for (const item of input.items) {
-    const available = stockMap.get(item.productId) ?? 0;
-    const product = productMap.get(item.productId)!;
-    if (available < item.quantity) {
+  for (const [productId, requested] of requestedByProduct) {
+    const available = stockMap.get(productId) ?? 0;
+    const product = productMap.get(productId)!;
+    if (available < requested) {
       throw new SaleValidationError(
         "INSUFFICIENT_STOCK",
         `Insufficient stock for ${product.name} (${available} available)`
@@ -315,11 +364,11 @@ export async function prepareSale(
     }
     // Expired batches are still counted in stock (they are never deleted),
     // but they cannot be sold unless an authorised user overrides it.
-    const batches = batchMap.get(item.productId) ?? [];
+    const batches = batchMap.get(productId) ?? [];
     const expiredQty = expiredQuantity(batches);
     if (expiredQty > 0) {
       const sellable = sellableQuantity(batches);
-      const wouldUseExpired = item.quantity > sellable;
+      const wouldUseExpired = requested > sellable;
       if (wouldUseExpired && !input.allowExpired) {
         throw new SaleValidationError(
           "EXPIRED_PRODUCT",
@@ -330,36 +379,47 @@ export async function prepareSale(
     }
   }
 
+  // 2b. Serialize concurrent checkouts of the same product. Both registers read
+  // stock inside their transaction; without a shared write the snapshots could
+  // both pass and the shop would oversell. Touching the product document makes
+  // the second transaction write-conflict and retry against fresh stock (the
+  // driver's withTransaction handles the retry).
+  await Product.updateMany(
+    { _id: { $in: productIds.map((id) => new mongoose.Types.ObjectId(id)) } },
+    { $inc: { stockVersion: 1 } },
+    { session }
+  );
+
   // 3. Server recalculates every total — client values are ignored. Active
   // discount offers are resolved here (never trusted from the payload), so the
   // percentage charged is the one running at checkout.
   const offerDiscounts = await resolveOfferDiscountsForProducts(productIds, { session });
-  const pricingInputs = input.items.map((item) => ({
-    productId: item.productId,
-    quantity: item.quantity,
-    unitDiscount: item.unitDiscount,
-    offerDiscountPercent: offerDiscounts.get(item.productId)?.percentage ?? 0,
-  }));
   let inventoryTotals: ReturnType<typeof computeSaleTotals>;
   try {
     // Inventory lines are priced at zero sale-level discount first so the
     // sale discount can be applied to the combined (inventory + direct) base.
-    // Lines are grouped by their own tier, then merged back into one sale.
-    const modeByProduct = new Map(
-      input.items.map((item) => [item.productId, item.pricingMode ?? pricingMode] as const)
-    );
-    const linesByMode = new Map<SalePricingMode, typeof pricingInputs>();
-    for (const line of pricingInputs) {
-      const mode = modeByProduct.get(line.productId) ?? pricingMode;
-      linesByMode.set(mode, [...(linesByMode.get(mode) ?? []), line]);
-    }
-
+    // Price each cart line separately: two flavours of the same product are
+    // distinct sale lines (different SKU line identity) even though they share
+    // inventory, and computing them individually preserves that order/mapping.
     const pricedItems: PricingItemResult[] = [];
     let combinedSubtotal = 0;
     let combinedLineDiscounts = 0;
     let combinedTax = 0;
-    for (const [mode, lines] of linesByMode) {
-      const part = computeSaleTotals(lines, serverProductAdapter(products), 0, input.discountType, mode);
+    for (const item of input.items) {
+      const part = computeSaleTotals(
+        [
+          {
+            productId: item.productId,
+            quantity: item.quantity,
+            unitDiscount: item.unitDiscount,
+            offerDiscountPercent: offerDiscounts.get(item.productId)?.percentage ?? 0,
+          },
+        ],
+        serverProductAdapter(products),
+        0,
+        input.discountType,
+        item.pricingMode ?? pricingMode
+      );
       pricedItems.push(...part.items);
       combinedSubtotal = round2(combinedSubtotal + part.subtotal);
       combinedLineDiscounts = round2(combinedLineDiscounts + part.discount);
@@ -395,7 +455,10 @@ export async function prepareSale(
   const discountAmount = round2(saleDiscountAmount + inventoryTotals.discount);
 
   const saleItems: PreparedTotals["items"] = [
-    ...inventoryTotals.items.map((item) => {
+    ...inventoryTotals.items.map((item, index) => {
+      // Inventory items are priced one-for-one in input order, so the scanned
+      // barcode/flavour of the line can be snapshotted from the request here.
+      const requestLine = input.items[index];
       // Preserve purchase origin on the sold line. A line that mixes Import and
       // Local units is marked null (unknown) — the per-batch movement rows below
       // still record the exact origin of every unit.
@@ -421,6 +484,8 @@ export async function prepareSale(
         purchaseSource,
         departmentId,
         departmentName: departmentId ? departmentNames.get(departmentId) ?? "" : "",
+        barcode: requestLine?.barcode ?? "",
+        flavour: requestLine?.flavour ?? "",
       };
     }),
     ...directTotals.items,
@@ -870,23 +935,32 @@ export async function persistPreparedSale(
   // per-batch quantities (and therefore expiry alerts) stay accurate.
   if (status === "completed") {
     const movementDocs: Array<Record<string, unknown>> = [];
+    // Several cart lines (different flavours/barcodes) may sell the same
+    // product. Stock is one pool per product, so allocate its batches ONCE for
+    // the combined quantity instead of re-allocating the same batch per line.
+    const quantityByProduct = new Map<string, { quantity: number; costPrice: number }>();
     for (const item of totals.items) {
       if (item.itemType !== "inventory" || !item.productId) continue;
-      const batches = prepared.batchMap.get(item.productId) ?? [];
-      const allocations = allocateQuantity(batches, item.quantity, {
+      const current = quantityByProduct.get(item.productId);
+      if (current) current.quantity += item.quantity;
+      else quantityByProduct.set(item.productId, { quantity: item.quantity, costPrice: item.costPrice });
+    }
+    for (const [productId, saleLine] of quantityByProduct) {
+      const batches = prepared.batchMap.get(productId) ?? [];
+      const allocations = allocateQuantity(batches, saleLine.quantity, {
         allowExpired: input.allowExpired === true,
       });
       const lines =
         allocations.length > 0
           ? allocations
-          : [{ batchNumber: "", expirationDate: null, quantity: item.quantity }];
+          : [{ batchNumber: "", expirationDate: null, quantity: saleLine.quantity }];
       for (const line of lines) {
         movementDocs.push({
-          productId: new mongoose.Types.ObjectId(item.productId),
+          productId: new mongoose.Types.ObjectId(productId),
           branchId: input.branchId ? new mongoose.Types.ObjectId(input.branchId) : null,
           movementType: "SALE_OUT",
           quantity: line.quantity,
-          unitCost: item.costPrice,
+          unitCost: saleLine.costPrice,
           batchNumber: line.batchNumber,
           expirationDate: line.expirationDate,
           purchaseSource: line.purchaseSource ?? null,

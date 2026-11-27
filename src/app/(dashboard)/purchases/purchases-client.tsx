@@ -41,7 +41,7 @@ interface Purchase {
   paymentMethod: string;
   note: string;
   createdAt: string;
-  items: Array<{ productId: string; name: string; sku: string; quantity: number; purchasePrice: number; subtotal: number }>;
+  items: Array<{ productId: string; name: string; sku: string; quantity: number; purchasePrice: number; subtotal: number; barcode?: string; flavour?: string }>;
 }
 
 const STATUS_OPTIONS = [
@@ -71,6 +71,9 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
     tax: number;
     expirationDate: string;
     batchNumber: string;
+    /** Optional reporting metadata; stock still goes to the parent product. */
+    barcode: string;
+    flavour: string;
   };
 
   const emptyLine = (): PurchaseLine => ({
@@ -82,6 +85,8 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
     tax: 0,
     expirationDate: "",
     batchNumber: "",
+    barcode: "",
+    flavour: "",
   });
 
   const [form, setForm] = useState<{
@@ -294,6 +299,8 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
           tax: Number(i.tax) || 0,
           expirationDate: i.expirationDate || null,
           batchNumber: i.batchNumber.trim(),
+          barcode: i.barcode.trim().toUpperCase(),
+          flavour: i.flavour.trim(),
         })),
         discount: Number(form.discount),
         tax: Number(form.tax),
@@ -635,7 +642,9 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
                             index !== i &&
                             line.productId === product._id &&
                             line.expirationDate === item.expirationDate &&
-                            line.batchNumber.trim().toLowerCase() === item.batchNumber.trim().toLowerCase()
+                            line.batchNumber.trim().toLowerCase() === item.batchNumber.trim().toLowerCase() &&
+                            line.barcode.trim().toUpperCase() === item.barcode.trim().toUpperCase() &&
+                            line.flavour.trim().toLowerCase() === item.flavour.trim().toLowerCase()
                         );
                         if (duplicateIndex !== -1) {
                           const merged = [...form.items];
@@ -700,6 +709,24 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
                       onChange={(e) => updateItem(i, "batchNumber", e.target.value)}
                       placeholder="Auto from PO #"
                       className="w-44"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+                    Flavour / variant (optional)
+                    <Input
+                      value={item.flavour}
+                      onChange={(e) => updateItem(i, "flavour", e.target.value)}
+                      placeholder="e.g. Orange"
+                      className="w-40"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+                    Barcode (optional)
+                    <Input
+                      value={item.barcode}
+                      onChange={(e) => updateItem(i, "barcode", e.target.value.toUpperCase())}
+                      placeholder="e.g. 100001"
+                      className="w-40"
                     />
                   </label>
                   <p className="pb-2 text-xs text-slate-400">
@@ -803,7 +830,11 @@ export function PurchasesClient({ user, canCreate, canCancel }: PurchasesClientP
                       <p className="text-xs text-slate-500">{item.sku}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-slate-600">{item.quantity} × {money(Number(item.purchasePrice))}</p>
+                      <p className="text-sm text-slate-600">
+                        {item.quantity} × {money(Number(item.purchasePrice))}
+                        {item.flavour ? ` · ${item.flavour}` : ""}
+                        {item.barcode ? ` · ${item.barcode}` : ""}
+                      </p>
                       <p className="text-sm font-medium text-slate-900">{money(Number(item.subtotal))}</p>
                     </div>
                   </div>

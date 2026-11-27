@@ -10,6 +10,7 @@ import { success, badRequest, forbidden, notFound } from "@/lib/api";
 import { recordAuditLog, requestMeta } from "@/lib/audit";
 import { escapeRegex } from "@/lib/reports";
 import { generateEan13, isScannableCode, normalizeBarcode, suggestedBarcodeLabel } from "@/lib/barcode";
+import { productBarcodeRows } from "@/lib/product-barcodes";
 
 /**
  * Barcode management.
@@ -59,35 +60,20 @@ function rowsForProduct(product: {
   sku?: string;
   variantName?: string;
   barcode?: string;
+  barcodeLabel?: string;
   barcodes?: Array<{ code: string; label?: string }>;
 }): BarcodeRow[] {
-  const rows: BarcodeRow[] = [];
-  const primary = (product.barcode ?? "").toUpperCase();
-  if (primary) {
-    rows.push({
-      code: primary,
-      label: "Primary",
-      productId: String(product._id),
-      productName: product.name,
-      sku: product.sku ?? "",
-      variantName: product.variantName ?? "",
-      primary: true,
-    });
-  }
-  for (const entry of product.barcodes ?? []) {
-    const code = (entry.code ?? "").toUpperCase();
-    if (!code || code === primary) continue;
-    rows.push({
-      code,
-      label: entry.label ?? "",
-      productId: String(product._id),
-      productName: product.name,
-      sku: product.sku ?? "",
-      variantName: product.variantName ?? "",
-      primary: false,
-    });
-  }
-  return rows;
+  // Shared resolver: primary first, extras after, no duplicates. The primary
+  // barcode keeps its own flavour label (stored separately for compatibility).
+  return productBarcodeRows(product).map((row) => ({
+    code: row.code,
+    label: row.flavour,
+    productId: String(product._id),
+    productName: product.name,
+    sku: product.sku ?? "",
+    variantName: product.variantName ?? "",
+    primary: row.primary,
+  }));
 }
 
 export async function GET(req: NextRequest) {
@@ -116,7 +102,7 @@ export async function GET(req: NextRequest) {
     }
 
     const products = await Product.find(query)
-      .select("name sku variantName barcode barcodes")
+      .select("name sku variantName barcode barcodeLabel barcodes")
       .sort({ name: 1 })
       .limit(500)
       .lean();
@@ -190,6 +176,13 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
+        const ownPrimary = (product.barcode ?? "").toUpperCase();
+        if (ownPrimary === code || extras.some((b) => b.code.toUpperCase() === code)) {
+          return NextResponse.json(
+            badRequest(`Barcode ${code} is already assigned to this product`),
+            { status: 400 }
+          );
+        }
         const conflict = await findConflict(code);
         if (conflict) {
           return NextResponse.json(badRequest(`Barcode ${code} is already assigned to ${conflict.name}`), { status: 400 });
@@ -199,9 +192,10 @@ export async function POST(req: NextRequest) {
       }
 
       if (!product.barcode) {
+        // First barcode becomes the primary and keeps its flavour label.
         product.set("barcode", code);
-      }
-      if (!extras.some((b) => b.code === code) && code !== product.barcode) {
+        product.set("barcodeLabel", label);
+      } else if (!extras.some((b) => b.code.toUpperCase() === code) && code !== product.barcode.toUpperCase()) {
         extras.push({ code, label });
       }
       product.barcodes = extras;
@@ -227,8 +221,21 @@ export async function POST(req: NextRequest) {
       if (!isPrimary && index === -1) {
         return NextResponse.json(notFound("Barcode not found on this product"), { status: 404 });
       }
+      // Renaming onto another code this product already owns would create a
+      // duplicate registration on the same product.
+      if (
+        nextCode !== source &&
+        ((product.barcode ?? "").toUpperCase() === nextCode ||
+          extras.some((b) => b.code.toUpperCase() === nextCode))
+      ) {
+        return NextResponse.json(
+          badRequest(`Barcode ${nextCode} is already assigned to this product`),
+          { status: 400 }
+        );
+      }
       if (isPrimary) {
         product.set("barcode", nextCode);
+        if (parsed.data.label !== undefined) product.set("barcodeLabel", parsed.data.label.trim());
         // Avoid duplicating the primary inside the extra list.
         const remaining = extras.filter((b) => b.code.toUpperCase() !== nextCode);
         const movedIndex = remaining.findIndex((b) => b.code.toUpperCase() === source);
@@ -253,6 +260,7 @@ export async function POST(req: NextRequest) {
       const isPrimary = (product.barcode ?? "").toUpperCase() === code;
       if (isPrimary) {
         product.set("barcode", undefined);
+        product.set("barcodeLabel", "");
       }
       product.barcodes = extras.filter((b) => b.code.toUpperCase() !== code);
       message = "Barcode removed";
@@ -282,6 +290,7 @@ export async function POST(req: NextRequest) {
             name: product.name,
             sku: product.sku,
             barcode: product.barcode ?? "",
+            barcodeLabel: product.barcodeLabel ?? "",
             barcodes: rowsForProduct(product.toObject()),
           },
         },

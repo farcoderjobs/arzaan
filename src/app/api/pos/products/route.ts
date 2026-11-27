@@ -8,6 +8,8 @@ import mongoose from "mongoose";
 import { getProductBatches } from "@/lib/inventory-batches";
 import { expiredQuantity, sellableQuantity } from "@/lib/expiry";
 import { resolveOfferDiscountsForProducts } from "@/lib/discounts";
+import { normalizeBarcode } from "@/lib/barcode";
+import { resolveScannedBarcode } from "@/lib/product-barcodes";
 
 /**
  * POS product lookup — optimized for barcode scanners and fast search.
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
           { sku: new RegExp(`^${escaped}$`, "i") },
         ],
       })
-        .select("name sku barcode barcodes expirationDate variantName sellingPrice discountPrice taxRate costPrice categoryId")
+        .select("name sku barcode barcodeLabel barcodes expirationDate variantName sellingPrice discountPrice taxRate costPrice categoryId")
         .lean();
 
       if (!product) {
@@ -60,9 +62,14 @@ export async function GET(req: NextRequest) {
       const offer = (await resolveOfferDiscountsForProducts([product._id.toString()])).get(
         product._id.toString()
       );
+      // Resolve which barcode was actually scanned so the cart line carries the
+      // exact flavour label (a SKU match has no barcode/flavour).
+      const matched = resolveScannedBarcode(product, normalizeBarcode(barcode));
       return NextResponse.json({
         product: {
           ...product,
+          matchedBarcode: matched?.code ?? "",
+          flavour: matched?.flavour ?? "",
           currentStock: stock,
           // Expired stock stays in `currentStock` (never silently removed) but
           // is surfaced so the POS can warn before adding it to the cart.
@@ -84,6 +91,7 @@ export async function GET(req: NextRequest) {
         { sku: { $regex: escaped, $options: "i" } },
         { barcode: { $regex: escaped, $options: "i" } },
         { "barcodes.code": { $regex: escaped, $options: "i" } },
+        { "barcodes.label": { $regex: escaped, $options: "i" } },
       ];
     }
 

@@ -18,7 +18,8 @@
     "seed:export": "tsx scripts/export-seed-data.ts",
     "seed:data": "tsx scripts/seed-all-data.ts",
     "db:hydrate": "tsx scripts/hydrate-local-db.ts",
-    "db:check": "tsx scripts/check-local-db.ts"
+    "db:check": "tsx scripts/check-local-db.ts",
+    "db:admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@types/jsbarcode": "^3.11.4",

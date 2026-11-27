@@ -201,6 +201,9 @@ export async function buildReturnItems(
       sourceLineId: target.lineId,
       restock: isInventory && request.restock !== false,
       pricingMode: item.pricingMode ?? "retail",
+      // Preserve exactly which barcode/flavour was sold on the original line.
+      barcode: item.barcode ?? "",
+      flavour: item.flavour ?? "",
       name: item.name,
       sku: item.sku,
       quantity: request.quantity,

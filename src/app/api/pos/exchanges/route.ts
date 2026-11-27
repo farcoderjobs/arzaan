@@ -28,6 +28,8 @@ const replacementSchema = z
           productId: z.string().min(1),
           quantity: z.number().int().min(1).max(10000),
           unitDiscount: z.number().min(0).default(0),
+          barcode: z.string().trim().max(80).optional().default(""),
+          flavour: z.string().trim().max(80).optional().default(""),
         })
       )
       .default([]),

@@ -54,6 +54,14 @@ interface PosProduct {
   name: string;
   sku: string;
   barcode: string;
+  /** Flavour/variant label of the primary barcode. */
+  barcodeLabel?: string;
+  /** All scannable barcodes of this product (shared inventory). */
+  barcodes?: Array<{ code: string; label: string }>;
+  /** Barcode that was actually scanned (single-barcode lookup only). */
+  matchedBarcode?: string;
+  /** Flavour resolved from that barcode. */
+  flavour?: string;
   sellingPrice: number;
   /** Persisted wholesale price (products API exposes it as wholesalePrice). */
   discountPrice: number;
@@ -72,7 +80,12 @@ interface PosProduct {
 }
 
 interface CartItem {
+  /** Unique per cart line: same product + scanned barcode (flavours differ). */
+  lineKey: string;
   productId: string;
+  /** Scanned barcode and its flavour snapshot ("" when picked from the grid). */
+  barcode?: string;
+  flavour?: string;
   name: string;
   sku: string;
   unitPrice: number;
@@ -125,6 +138,9 @@ interface ReturnableLine {
   productId: string | null;
   itemType: "inventory" | "direct";
   pricingMode: "retail" | "wholesale";
+  /** Barcode/flavour preserved from the original sale line. */
+  barcode?: string;
+  flavour?: string;
   name: string;
   sku: string;
   quantity: number;
@@ -168,6 +184,7 @@ interface PaymentLine {
 }
 
 import { money, currencySymbol } from "@/lib/currency";
+import { saleLineKey } from "@/lib/product-barcodes";
 import { REFUND_REASONS, OTHER_REASON } from "@/lib/refund-reasons";
 import { PrintableReceipt, ReceiptData } from "@/components/receipt";
 
@@ -511,8 +528,8 @@ export function PosClient({
    * Per-item price tier: one line can be sold wholesale while everything else
    * stays retail. The top-bar checkbox still switches the whole cart.
    */
-  const toggleLineWholesale = (productId: string, enabled: boolean) => {
-    const line = cart.find((i) => i.productId === productId);
+  const toggleLineWholesale = (lineKey: string, enabled: boolean) => {
+    const line = cart.find((i) => i.lineKey === lineKey);
     if (!line || line.itemType === "direct") return;
     if (enabled) {
       if (!canWholesale) {
@@ -530,7 +547,7 @@ export function PosClient({
     }
     setCart((prev) =>
       prev.map((i) =>
-        i.productId === productId
+        i.lineKey === lineKey
           ? {
               ...i,
               unitPrice: enabled ? i.wholesalePrice ?? i.unitPrice : i.retailPrice ?? i.unitPrice,
@@ -567,10 +584,12 @@ export function PosClient({
       setDirectError("Tax must be between 0 and 100");
       return;
     }
+    const directKey = `direct:${newClientTransactionId()}`;
     setCart((prev) => [
       ...prev,
       {
-        productId: `direct:${newClientTransactionId()}`,
+        lineKey: directKey,
+        productId: directKey,
         name: description,
         sku: "DIRECT",
         unitPrice: price,
@@ -589,7 +608,12 @@ export function PosClient({
   };
 
   // ---------- Cart ----------
-  const addToCart = useCallback((product: PosProduct, qty = 1) => {
+  const addToCart = useCallback((product: PosProduct, qty = 1, meta?: { barcode?: string; flavour?: string }) => {
+    const barcode = (meta?.barcode ?? "").trim().toUpperCase();
+    const flavour = (meta?.flavour ?? "").trim();
+    // Scanning any barcode of the product lands here; the line keeps the
+    // scanned flavour, but the stock pool is always the parent product's.
+    const lineKey = saleLineKey(product._id, barcode);
     if (product.currentStock <= 0) {
       warning("Out of stock", `${product.name} has no stock`);
       return;
@@ -615,18 +639,26 @@ export function PosClient({
       }
     }
     setCart((prev) => {
-      const existing = prev.find((i) => i.productId === product._id);
+      // Shared inventory: cap the TOTAL of every line of this product, not the
+      // individual flavour line, so two flavours cannot exceed stock together.
+      const inCart = prev
+        .filter((i) => i.itemType !== "direct" && i.productId === product._id)
+        .reduce((sum, i) => sum + i.quantity, 0);
+      if (inCart + qty > product.currentStock) {
+        warning("Stock limit", `Only ${product.currentStock} units of ${product.name} available`);
+        return prev;
+      }
+      const existing = prev.find((i) => i.lineKey === lineKey);
       if (existing) {
-        if (existing.quantity + qty > product.currentStock) {
-          warning("Stock limit", `Only ${product.currentStock} units of ${product.name} available`);
-          return prev;
-        }
-        return prev.map((i) => (i.productId === product._id ? { ...i, quantity: i.quantity + qty } : i));
+        return prev.map((i) => (i.lineKey === lineKey ? { ...i, quantity: i.quantity + qty } : i));
       }
       return [
         ...prev,
         {
+          lineKey,
           productId: product._id,
+          barcode,
+          flavour,
           name: product.name,
           sku: product.sku,
           unitPrice: priceFor(product, pricingMode),
@@ -644,24 +676,40 @@ export function PosClient({
     });
   }, [canOverrideExpired, pricingMode]);
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart((prev) =>
-      prev
+  /** Units of this product still available across all flavour lines. */
+  const canIncreaseLine = (line: CartItem): boolean => {
+    if (line.itemType === "direct") return true;
+    const total = cart
+      .filter((i) => i.itemType !== "direct" && i.productId === line.productId)
+      .reduce((sum, i) => sum + i.quantity, 0);
+    return total < line.maxStock;
+  };
+
+  const updateQuantity = (lineKey: string, delta: number) => {
+    setCart((prev) => {
+      const line = prev.find((i) => i.lineKey === lineKey);
+      if (!line) return prev;
+      // Other flavours of the same product already reserve part of the stock.
+      const others = prev
+        .filter((i) => i.lineKey !== lineKey && i.itemType !== "direct" && i.productId === line.productId)
+        .reduce((sum, i) => sum + i.quantity, 0);
+      const maxForLine = line.itemType === "direct" ? 999999 : Math.max(0, line.maxStock - others);
+      return prev
         .map((i) =>
-          i.productId === productId
-            ? { ...i, quantity: Math.min(Math.max(i.quantity + delta, 0), i.maxStock) }
+          i.lineKey === lineKey
+            ? { ...i, quantity: Math.min(Math.max(i.quantity + delta, 0), maxForLine) }
             : i
         )
-        .filter((i) => i.quantity > 0)
-    );
+        .filter((i) => i.quantity > 0);
+    });
   };
 
-  const setItemDiscount = (productId: string, value: string) => {
+  const setItemDiscount = (lineKey: string, value: string) => {
     const num = Number(value) || 0;
-    setCart((prev) => prev.map((i) => (i.productId === productId ? { ...i, unitDiscount: Math.max(0, num) } : i)));
+    setCart((prev) => prev.map((i) => (i.lineKey === lineKey ? { ...i, unitDiscount: Math.max(0, num) } : i)));
   };
 
-  const removeItem = (productId: string) => setCart((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = (lineKey: string) => setCart((prev) => prev.filter((i) => i.lineKey !== lineKey));
   const clearCart = () => {
     setCart([]);
     setSaleDiscount("0");
@@ -683,10 +731,17 @@ export function PosClient({
       if (res.ok) {
         const data = await res.json();
         if (data.product) {
-          addToCart(data.product);
+          addToCart(data.product, 1, {
+            barcode: data.matchedBarcode ?? "",
+            flavour: data.flavour ?? "",
+          });
           setSearch("");
           return;
         }
+        // A scanner code that matches nothing must say so clearly instead of
+        // silently doing a text search for a barcode.
+        warning("Product not found", `No product is registered with barcode ${term}`);
+        return;
       }
       // No exact barcode hit — fall through to grid search (already live)
     } catch {
@@ -945,6 +1000,8 @@ export function PosClient({
             quantity: i.quantity,
             unitDiscount: canDiscount ? i.unitDiscount : 0,
             pricingMode: i.pricingMode ?? "retail",
+            barcode: i.barcode ?? "",
+            flavour: i.flavour ?? "",
           })),
           directItems: directLines.map((i) => ({
             description: i.name,
@@ -993,6 +1050,7 @@ export function PosClient({
             total: l.lineTotal,
             direct: l.itemType === "direct",
             pricingMode: l.pricingMode,
+            flavour: l.flavour,
           })),
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
@@ -1070,7 +1128,13 @@ export function PosClient({
       if (!res.ok) throw new Error();
       const data = await res.json();
       const c = data.data.cart;
-      const heldItems = c.items as Array<{ productId: string; quantity: number; unitDiscount: number }>;
+      const heldItems = c.items as Array<{
+        productId: string;
+        quantity: number;
+        unitDiscount: number;
+        barcode?: string;
+        flavour?: string;
+      }>;
 
       // Re-price from the catalog so the resumed cart shows accurate numbers.
       const catalogRes = await fetch("/api/pos/products?perPage=100");
@@ -1085,7 +1149,10 @@ export function PosClient({
       const restored: CartItem[] = heldItems.map((i) => {
         const p = map.get(i.productId);
         return {
+          lineKey: saleLineKey(i.productId, i.barcode),
           productId: i.productId,
+          barcode: i.barcode ?? "",
+          flavour: i.flavour ?? "",
           name: p?.name ?? "Product",
           sku: p?.sku ?? "",
           unitPrice: p ? priceFor(p, restoredMode) : 0,
@@ -1108,8 +1175,10 @@ export function PosClient({
         taxRate: number;
       }>;
       for (const d of heldDirect) {
+        const directKey = `direct:${newClientTransactionId()}`;
         restored.push({
-          productId: `direct:${newClientTransactionId()}`,
+          lineKey: directKey,
+          productId: directKey,
           name: d.description,
           sku: "DIRECT",
           unitPrice: d.unitPrice,
@@ -1301,6 +1370,8 @@ export function PosClient({
                     quantity: i.quantity,
                     unitDiscount: canDiscount ? i.unitDiscount : 0,
                     pricingMode: i.pricingMode ?? "retail",
+                    barcode: i.barcode ?? "",
+                    flavour: i.flavour ?? "",
                   })),
                   directItems: directLines.map((i) => ({
                     description: i.name,
@@ -1667,7 +1738,7 @@ export function PosClient({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {totals.lines.map((line) => (
-                  <li key={line.productId} className="px-4 py-2.5">
+                  <li key={line.lineKey} className="px-4 py-2.5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-slate-900">
@@ -1692,16 +1763,21 @@ export function PosClient({
                             >
                               <input
                                 type="checkbox"
-                                data-testid={`line-wholesale-${line.productId}`}
+                                data-testid={`line-wholesale-${line.lineKey}`}
                                 checked={line.pricingMode === "wholesale"}
                                 disabled={!canWholesale || (line.wholesalePrice ?? 0) <= 0}
-                                onChange={(e) => toggleLineWholesale(line.productId, e.target.checked)}
+                                onChange={(e) => toggleLineWholesale(line.lineKey, e.target.checked)}
                                 className="h-3.5 w-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500/40 disabled:cursor-not-allowed"
                               />
                               WS
                             </label>
                           )}
                           <span className="truncate">{line.name}</span>
+                          {line.flavour && (
+                            <span className="ms-1 shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-sky-700">
+                              {line.flavour}
+                            </span>
+                          )}
                           {line.itemType === "direct" && (
                             <span className="ms-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-700">
                               Direct
@@ -1717,7 +1793,8 @@ export function PosClient({
                           )}
                         </p>
                         <p className="text-xs text-slate-400">
-                          {line.itemType === "direct" ? "No stock movement" : line.sku} · {money(line.unitPrice)}
+                          {line.itemType === "direct" ? "No stock movement" : line.sku}
+                          {line.barcode ? ` · ${line.barcode}` : ""} · {money(line.unitPrice)}
                           {line.itemType !== "direct" && (
                             <span
                               className={cn(
@@ -1732,17 +1809,17 @@ export function PosClient({
                           )}
                         </p>
                       </div>
-                      <button onClick={() => removeItem(line.productId)} className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500">
+                      <button onClick={() => removeItem(line.lineKey)} className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                     <div className="mt-1.5 flex items-center gap-2">
                       <div className="flex items-center rounded-lg border border-slate-200">
-                        <button onClick={() => updateQuantity(line.productId, -1)} className="px-2 py-1 text-slate-500 hover:bg-slate-50" aria-label="Decrease">
+                        <button onClick={() => updateQuantity(line.lineKey, -1)} className="px-2 py-1 text-slate-500 hover:bg-slate-50" aria-label="Decrease">
                           <Minus className="h-3.5 w-3.5" />
                         </button>
                         <span className="min-w-[2rem] text-center text-sm font-semibold">{line.quantity}</span>
-                        <button onClick={() => updateQuantity(line.productId, +1)} className="px-2 py-1 text-slate-500 hover:bg-slate-50 disabled:opacity-40" disabled={line.quantity >= line.maxStock} aria-label="Increase">
+                        <button onClick={() => updateQuantity(line.lineKey, +1)} className="px-2 py-1 text-slate-500 hover:bg-slate-50 disabled:opacity-40" disabled={!canIncreaseLine(line)} aria-label="Increase">
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -1754,7 +1831,7 @@ export function PosClient({
                             min="0"
                             step="0.01"
                             value={line.unitDiscount || ""}
-                            onChange={(e) => setItemDiscount(line.productId, e.target.value)}
+                            onChange={(e) => setItemDiscount(line.lineKey, e.target.value)}
                             placeholder="0"
                             className="w-16 rounded border border-slate-200 px-1.5 py-1 text-right text-xs focus:border-blue-500 focus:outline-none"
                           />
@@ -2088,6 +2165,11 @@ export function PosClient({
                             )}
                           </p>
                           <p className="text-xs text-slate-400">{money(line.sellingPrice)} · {line.sku}</p>
+                          {(line.flavour || line.barcode) && (
+                            <p className="text-xs text-slate-400">
+                              {[line.flavour, line.barcode].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
                           <p className="text-xs font-medium text-emerald-700">
                             Refund {money(line.unitRefund ?? line.sellingPrice)} per unit
                           </p>

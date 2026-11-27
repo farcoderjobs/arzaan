@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
           sku: i.sku,
           quantity: i.quantity,
           unitDiscount: i.discount,
+          barcode: i.barcode ?? "",
+          flavour: i.flavour ?? "",
         })),
       // Direct-sale lines are restored as-is (they have no product/stock).
       directItems: held.items

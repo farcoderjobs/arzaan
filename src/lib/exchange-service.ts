@@ -30,7 +30,13 @@ import {
  */
 
 export type ExchangeReplacement = {
-  items: Array<{ productId: string; quantity: number; unitDiscount: number }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    unitDiscount: number;
+    barcode?: string;
+    flavour?: string;
+  }>;
   directItems?: Array<{
     description: string;
     quantity: number;
@@ -459,6 +465,8 @@ export async function lookupSaleForReturn(saleId: string) {
           productId: item.productId?.toString() ?? null,
           itemType: item.itemType ?? "inventory",
           pricingMode: item.pricingMode ?? "retail",
+          barcode: item.barcode ?? "",
+          flavour: item.flavour ?? "",
           name: item.name,
           sku: item.sku,
           quantity: item.quantity,

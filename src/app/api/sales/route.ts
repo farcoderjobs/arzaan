@@ -10,6 +10,7 @@ import mongoose from "mongoose";
 import { completeSale, SaleValidationError } from "@/lib/sales-service";
 import { recordAuditLog, requestMeta } from "@/lib/audit";
 import { getStoreSettings } from "@/lib/settings";
+import { saleLineKey } from "@/lib/product-barcodes";
 
 /**
  * Sales API.
@@ -27,6 +28,10 @@ const checkoutSchema = z.object({
         productId: z.string().min(1),
         quantity: z.number().int().min(1).max(10000),
         unitDiscount: z.number().min(0).default(0),
+        /** Barcode scanned for this line (optional; enables flavour reporting). */
+        barcode: z.string().trim().max(80).optional().default(""),
+        /** Flavour/variant label shown with the line (server re-reads it too). */
+        flavour: z.string().trim().max(80).optional().default(""),
         /** Per-line price tier; omitted lines use the sale-level tier. */
         pricingMode: z.enum(["retail", "wholesale"]).optional(),
       })
@@ -179,19 +184,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Merge duplicate product lines so stock math is correct
-    const merged = new Map<string, { quantity: number; unitDiscount: number; pricingMode?: "retail" | "wholesale" }>();
+    // Merge only identical cart lines (same product AND same scanned barcode).
+    // Different flavours of one product stay on separate lines for reporting,
+    // while stock is still validated once for the whole product further down.
+    const merged = new Map<
+      string,
+      { productId: string; quantity: number; unitDiscount: number; barcode: string; flavour: string; pricingMode?: "retail" | "wholesale" }
+    >();
     for (const item of data.items) {
-      const existing = merged.get(item.productId);
+      const barcode = item.barcode.trim().toUpperCase();
+      const key = saleLineKey(item.productId, barcode);
+      const existing = merged.get(key);
       if (existing) {
         existing.quantity += item.quantity;
         existing.unitDiscount += item.unitDiscount;
         // A line is wholesale if any of its merged rows asked for wholesale.
         if (item.pricingMode === "wholesale") existing.pricingMode = "wholesale";
       } else {
-        merged.set(item.productId, {
+        merged.set(key, {
+          productId: item.productId,
           quantity: item.quantity,
           unitDiscount: item.unitDiscount,
+          barcode,
+          flavour: item.flavour.trim(),
           pricingMode: item.pricingMode,
         });
       }
@@ -222,7 +237,7 @@ export async function POST(req: NextRequest) {
       branchId: user.branchId,
       customerId: data.customerId,
       cashierId: user.id,
-      items: [...merged.entries()].map(([productId, v]) => ({ productId, ...v })),
+      items: [...merged.values()],
       directItems: data.directItems,
       discount: data.discount,
       discountType: data.discountType,

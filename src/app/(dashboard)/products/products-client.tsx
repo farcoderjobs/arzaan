@@ -13,6 +13,7 @@ import { success, error } from "@/utils/toast";
 import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/utils/classname";
 import { Plus, Edit, Eye, Toggle } from "@/components/ui/icons";
+import { productBarcodeRows } from "@/lib/product-barcodes";
 
 interface ProductsClientProps {
   user: SessionUser;
@@ -27,6 +28,7 @@ type ProductRow = {
   name: string;
   sku: string;
   barcode?: string;
+  barcodeLabel?: string;
   barcodes?: Array<{ code: string; label: string }>;
   description?: string;
   categoryId?: string | { _id: string; name: string } | null;
@@ -66,7 +68,8 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
   const [form, setForm] = useState({
     name: "",
     sku: "",
-    barcode: "",
+    /** First row is the primary barcode; the rest are additional flavours. */
+    barcodes: [{ code: "", label: "" }] as Array<{ code: string; label: string }>,
     categoryId: "",
     brandId: "",
     departmentId: "",
@@ -81,6 +84,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     status: "active" as ProductStatus,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [barcodeBulk, setBarcodeBulk] = useState("");
   const [saving, setSaving] = useState(false);
   const [toggleTarget, setToggleTarget] = useState<ProductRow | null>(null);
   const [toggling, setToggling] = useState(false);
@@ -158,7 +162,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     setForm({
       name: "",
       sku: "",
-      barcode: "",
+      barcodes: [{ code: "", label: "" }],
       categoryId: "",
       brandId: "",
       departmentId: "",
@@ -172,6 +176,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       description: "",
       status: "active",
     });
+    setBarcodeBulk("");
     setFormErrors({});
   };
 
@@ -181,7 +186,10 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     setForm({
       name: product.name ?? "",
       sku: product.sku ?? "",
-      barcode: product.barcode ?? "",
+      barcodes: (() => {
+        const rows = productBarcodeRows(product).map((b) => ({ code: b.code, label: b.flavour }));
+        return rows.length > 0 ? rows : [{ code: "", label: "" }];
+      })(),
       categoryId: product.categoryId?.toString() ?? "",
       brandId: product.brandId?.toString() ?? "",
       departmentId:
@@ -198,6 +206,7 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
       description: product.description ?? "",
       status: (product.status ?? "active") as ProductStatus,
     });
+    setBarcodeBulk("");
     setFormErrors({});
   };
 
@@ -206,10 +215,77 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     setModalMode("view");
   };
 
+  const updateBarcodeRow = (index: number, patch: Partial<{ code: string; label: string }>) => {
+    setForm((prev) => ({
+      ...prev,
+      barcodes: prev.barcodes.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    }));
+  };
+
+  const addBarcodeRow = () => {
+    setForm((prev) => ({ ...prev, barcodes: [...prev.barcodes, { code: "", label: "" }] }));
+  };
+
+  const removeBarcodeRow = (index: number) => {
+    setForm((prev) => {
+      const next = prev.barcodes.filter((_, i) => i !== index);
+      return { ...prev, barcodes: next.length > 0 ? next : [{ code: "", label: "" }] };
+    });
+  };
+
+  /** Appends pasted codes, one per line as `code` or `Flavour, code`. */
+  const applyBulkBarcodes = () => {
+    const lines = barcodeBulk
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+
+    const rows = form.barcodes.map((row) => ({ ...row }));
+    const seen = new Set(rows.map((row) => row.code.trim().toUpperCase()).filter(Boolean));
+    let added = 0;
+    let skipped = 0;
+
+    for (const line of lines) {
+      const parts = line.split(/[\t,|]/).map((part) => part.trim()).filter(Boolean);
+      const code = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).toUpperCase();
+      const label = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
+      if (!code || seen.has(code)) {
+        skipped += 1;
+        continue;
+      }
+      seen.add(code);
+      const emptyIndex = rows.findIndex((row) => !row.code.trim());
+      if (emptyIndex !== -1) rows[emptyIndex] = { code, label };
+      else rows.push({ code, label });
+      added += 1;
+    }
+
+    setForm({ ...form, barcodes: rows });
+    setBarcodeBulk("");
+    success("Barcodes", `${added} added${skipped > 0 ? `, ${skipped} skipped` : ""}`);
+  };
+
   const validateForm = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = "Name is required";
     if (!form.sku.trim()) errs.sku = "SKU is required";
+    // Barcode rows: a label without a code is incomplete, and the same code may
+    // never be entered twice on one product.
+    const seenCodes = new Set<string>();
+    for (const row of form.barcodes) {
+      const code = row.code.trim().toUpperCase();
+      if (!code && row.label.trim()) {
+        errs.barcodes = "Add a barcode for every flavour you entered";
+        break;
+      }
+      if (!code) continue;
+      if (seenCodes.has(code)) {
+        errs.barcodes = `Barcode ${code} is entered more than once`;
+        break;
+      }
+      seenCodes.add(code);
+    }
     if (form.purchasePrice && isNaN(Number(form.purchasePrice))) errs.purchasePrice = "Invalid number";
     if (form.sellingPrice && isNaN(Number(form.sellingPrice))) errs.sellingPrice = "Invalid number";
     if (form.tax && (Number(form.tax) < 0 || Number(form.tax) > 100)) errs.tax = "Must be 0–100";
@@ -225,11 +301,19 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
     if (!validateForm()) return;
     setSaving(true);
     try {
+      // The first filled row is the primary barcode, the rest are additional
+      // flavours. Every one points at this same product and its shared stock.
+      const filledBarcodes = form.barcodes
+        .map((row) => ({ code: row.code.trim().toUpperCase(), label: row.label.trim() }))
+        .filter((row) => row.code);
+      const primaryBarcode = filledBarcodes[0];
       const payload = {
         id: selected?._id?.toString() ?? null,
         name: form.name.trim(),
         sku: form.sku.trim().toUpperCase(),
-        barcode: form.barcode.trim().toUpperCase(),
+        barcode: primaryBarcode?.code ?? "",
+        barcodeLabel: primaryBarcode?.label ?? "",
+        barcodes: filledBarcodes.slice(1),
         categoryId: form.categoryId || null,
         brandId: form.brandId || null,
         departmentId: form.departmentId || null,
@@ -596,11 +680,18 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">{selected.name}</h3>
                 <p className="text-sm text-slate-500">{selected.sku}</p>
-                {selected.barcode && <p className="text-sm text-slate-500">Barcode: {selected.barcode}</p>}
-                {(selected.barcodes ?? []).length > 0 && (
-                  <p className="text-sm text-slate-500">
-                    Other barcodes: {(selected.barcodes ?? []).map((b) => b.code).join(", ")}
-                  </p>
+                {productBarcodeRows(selected).length === 0 ? (
+                  <p className="text-sm text-slate-400">No barcode assigned</p>
+                ) : (
+                  <ul className="mt-1 space-y-0.5 text-sm text-slate-500">
+                    {productBarcodeRows(selected).map((barcode) => (
+                      <li key={barcode.code}>
+                        <span className="font-mono">{barcode.code}</span>
+                        {barcode.flavour ? ` · ${barcode.flavour}` : ""}
+                        {barcode.primary ? " · primary" : ""}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>
@@ -657,22 +748,101 @@ export function ProductsClient({ user, canCreate }: ProductsClientProps) {
               </FormField>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Barcode">
-                <Input
-                  value={form.barcode}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value.toUpperCase() })}
-                  placeholder="Barcode (optional)"
+            <FormField label="Category" required error={formErrors.categoryId}>
+              <Select
+                value={form.categoryId}
+                onChange={(v) => setForm({ ...form, categoryId: v })}
+                options={categories.map((c) => ({ value: c._id, label: c.name }))}
+                placeholder="Select category"
+              />
+            </FormField>
+
+            {/* Multiple barcodes, one product / one shared stock quantity. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Barcodes &amp; flavours</p>
+                  <p className="text-xs text-slate-500">
+                    All barcodes belong to this one product and share its single stock quantity. The
+                    first row is the primary barcode.
+                  </p>
+                </div>
+                <Button type="button" variant="secondary" size="sm" onClick={addBarcodeRow}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Add barcode
+                </Button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {form.barcodes.map((row, index) => (
+                  <div key={index} className="flex flex-wrap items-end gap-2">
+                    <div className="w-40">
+                      <label className="mb-1 block text-xs font-medium text-slate-500">
+                        {index === 0 ? "Flavour (primary)" : "Flavour / variant"}
+                      </label>
+                      <Input
+                        value={row.label}
+                        onChange={(e) => updateBarcodeRow(index, { label: e.target.value })}
+                        placeholder="e.g. Orange"
+                      />
+                    </div>
+                    <div className="min-w-[180px] flex-1">
+                      <label className="mb-1 block text-xs font-medium text-slate-500">
+                        Barcode
+                        {index === 0 && (
+                          <span className="ms-1 rounded bg-blue-100 px-1 py-0.5 text-[10px] font-semibold uppercase text-blue-700">
+                            primary
+                          </span>
+                        )}
+                      </label>
+                      <Input
+                        value={row.code}
+                        onChange={(e) => updateBarcodeRow(index, { code: e.target.value.toUpperCase() })}
+                        placeholder="e.g. 100001"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mb-0.5 text-red-500"
+                      aria-label={`Remove barcode ${row.code || index + 1}`}
+                      onClick={() => removeBarcodeRow(index)}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {formErrors.barcodes && (
+                <p className="mt-2 text-sm text-red-600">{formErrors.barcodes}</p>
+              )}
+
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <p className="text-xs font-medium text-slate-600">Paste multiple barcodes — one per line</p>
+                <p className="text-[11px] text-slate-400">
+                  Use <span className="font-mono">code</span> or{" "}
+                  <span className="font-mono">Flavour, code</span> per line.
+                </p>
+                <textarea
+                  value={barcodeBulk}
+                  onChange={(e) => setBarcodeBulk(e.target.value)}
+                  rows={3}
+                  placeholder={"Orange, 100001\nMango, 100002\n100003"}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
-              </FormField>
-              <FormField label="Category" required error={formErrors.categoryId}>
-                <Select
-                  value={form.categoryId}
-                  onChange={(v) => setForm({ ...form, categoryId: v })}
-                  options={categories.map((c) => ({ value: c._id, label: c.name }))}
-                  placeholder="Select category"
-                />
-              </FormField>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2"
+                  disabled={!barcodeBulk.trim()}
+                  onClick={applyBulkBarcodes}
+                >
+                  Add pasted barcodes
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

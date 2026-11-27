@@ -233,6 +233,57 @@ export async function GET(req: NextRequest) {
         { $group: { _id: "$categoryId" } },
         { $count: "total" },
       ]).then((r) => r[0]?.total ?? 0);
+    } else if (groupBy === "flavour") {
+      // Flavour / barcode-wise sales. Every row is one product + flavour +
+      // barcode; the same product's rows still sum to its one shared inventory.
+      const flavourPipeline: mongoose.PipelineStage[] = [
+        { $match: baseMatch },
+        { $unwind: "$items" },
+        { $match: { "items.itemType": { $ne: "direct" } } },
+        {
+          $group: {
+            _id: {
+              productId: "$items.productId",
+              name: "$items.name",
+              sku: "$items.sku",
+              barcode: { $ifNull: ["$items.barcode", ""] },
+              flavour: { $ifNull: ["$items.flavour", ""] },
+            },
+            quantity: { $sum: "$items.quantity" },
+            revenue: { $sum: "$items.subtotal" },
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $project: {
+            // Stable string row key for the UI table (one row per flavour/code).
+            _id: { $concat: [{ $toString: "$_id.productId" }, "::", "$_id.barcode"] },
+            productName: "$_id.name",
+            sku: "$_id.sku",
+            barcode: "$_id.barcode",
+            flavour: "$_id.flavour",
+            label: {
+              $concat: [
+                { $ifNull: ["$_id.name", "—"] },
+                { $cond: [{ $gt: ["$_id.flavour", ""] }, { $concat: [" · ", "$_id.flavour"] }, ""] },
+                { $cond: [{ $gt: ["$_id.barcode", ""] }, { $concat: [" · ", "$_id.barcode"] }, ""] },
+              ],
+            },
+            quantity: 1,
+            revenue: 1,
+            count: 1,
+          },
+        },
+        { $sort: { revenue: -1 } },
+      ];
+      breakdown = await Sale.aggregate([
+        ...flavourPipeline,
+        { $skip: skip },
+        { $limit: perPage },
+      ]);
+      breakdownTotal = await Sale.aggregate([...flavourPipeline, { $count: "total" }]).then(
+        (r) => r[0]?.total ?? 0
+      );
     }
 
     // Normalize breakdown rows
@@ -243,9 +294,42 @@ export async function GET(req: NextRequest) {
       refunds: round2((b.refunds as number) ?? 0),
       quantity: (b.quantity as number) ?? null,
       count: (b.count as number) ?? null,
+      ...(b.productName !== undefined
+        ? {
+            productName: (b.productName as string) ?? "",
+            flavour: (b.flavour as string) ?? "",
+            barcode: (b.barcode as string) ?? "",
+            sku: (b.sku as string) ?? "",
+          }
+        : {}),
     }));
 
     if (searchParams.get("format") === "csv") {
+      if (groupBy === "flavour") {
+        const csvRows: Array<Array<string | number>> = [
+          ["Product", "Flavour", "Barcode", "Sold", "Revenue", "Transactions"],
+        ];
+        for (const r of rows) {
+          csvRows.push([
+            r.productName ?? "",
+            r.flavour ?? "",
+            r.barcode ?? "",
+            r.quantity ?? 0,
+            r.revenue,
+            r.count ?? 0,
+          ]);
+        }
+        csvRows.push([]);
+        csvRows.push([
+          "TOTAL (range)",
+          "",
+          "",
+          rows.reduce((sum, r) => sum + (r.quantity ?? 0), 0),
+          summary.netSales,
+          summary.count,
+        ]);
+        return csvResponse(`sales-by-flavour-${new Date().toISOString().slice(0, 10)}.csv`, csvRows);
+      }
       const csvRows: Array<Array<string | number>> = [["Group", "Revenue (net of refunds)", "Net Revenue", "Refunds", "Transactions"]];
       for (const r of rows) csvRows.push([r.label, r.revenue, r.netRevenue, r.refunds, r.count ?? 0]);
       csvRows.push([]);

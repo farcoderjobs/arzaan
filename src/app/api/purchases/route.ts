@@ -22,6 +22,8 @@ import { recordAuditLog, requestMeta, diffForAudit } from "@/lib/audit";
 import { assertBranchAccess, BranchAccessError } from "@/lib/branch-access";
 import { generatePurchaseNumber } from "@/lib/document-number";
 import { Department } from "@/models";
+import { normalizeBarcode } from "@/lib/barcode";
+import { resolveScannedBarcode } from "@/lib/product-barcodes";
 
 const purchaseItemSchema = z.object({
   productId: z.string().min(1, "Product is required"),
@@ -34,6 +36,9 @@ const purchaseItemSchema = z.object({
   expirationDate: z.string().trim().nullable().optional(),
   /** Optional human batch code; auto-generated when only an expiry is given. */
   batchNumber: z.string().trim().max(60).optional(),
+  /** Optional flavour/barcode this purchased stock is for (reporting only). */
+  barcode: z.string().trim().max(80).optional().default(""),
+  flavour: z.string().trim().max(80).optional().default(""),
 });
 
 const createPurchaseSchema = z.object({
@@ -191,7 +196,17 @@ export async function POST(req: NextRequest) {
 
       // Fetch products and snapshot names/prices
       const productIds = data.items.map((item) => item.productId);
-      const products = await Product.find({ _id: { $in: productIds } }).lean<Array<{ _id: unknown; name: string; sku: string; sellingPrice: number }>>();
+      const products = await Product.find({ _id: { $in: productIds } }).lean<
+        Array<{
+          _id: unknown;
+          name: string;
+          sku: string;
+          sellingPrice: number;
+          barcode?: string;
+          barcodeLabel?: string;
+          barcodes?: Array<{ code: string; label?: string }>;
+        }>
+      >();
       // lean() returns _id as an ObjectId — key by string so lookups with the
       // request's string product ids actually match.
       const productMap = new Map(products.map((p) => [String(p._id), p]));
@@ -201,6 +216,30 @@ export async function POST(req: NextRequest) {
         if (!product) {
           return NextResponse.json(badRequest(`Product ${item.productId} not found`), { status: 400 });
         }
+      }
+
+      // A barcode supplied on a purchase line must belong to the product. It is
+      // reporting metadata only: the full quantity below still lands on the
+      // parent product's single shared stock pool.
+      const barcodeInfo = new Map<number, { barcode: string; flavour: string }>();
+      for (const [index, item] of data.items.entries()) {
+        const product = productMap.get(item.productId)!;
+        const supplied = normalizeBarcode(item.barcode ?? "");
+        if (!supplied) {
+          barcodeInfo.set(index, { barcode: "", flavour: (item.flavour ?? "").trim() });
+          continue;
+        }
+        const resolved = resolveScannedBarcode(product, supplied);
+        if (!resolved) {
+          return NextResponse.json(
+            badRequest(`Barcode ${supplied} is not registered for ${product.name}`),
+            { status: 400 }
+          );
+        }
+        barcodeInfo.set(index, {
+          barcode: resolved.code,
+          flavour: resolved.flavour || (item.flavour ?? "").trim(),
+        });
       }
 
       // Every received line may carry its own expiry/batch. Invalid dates are
@@ -238,6 +277,8 @@ export async function POST(req: NextRequest) {
           subtotal: itemSubtotal,
           batchNumber,
           expirationDate,
+          barcode: barcodeInfo.get(index)?.barcode ?? "",
+          flavour: barcodeInfo.get(index)?.flavour ?? "",
         };
       });
 
